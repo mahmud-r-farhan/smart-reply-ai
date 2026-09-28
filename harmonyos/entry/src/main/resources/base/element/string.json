@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "Smart Reply AI Entry Module"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Smart Reply AI Native Assistant"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "Smart Reply AI"
+    }
+  ]
+}

@@ -104,6 +104,7 @@ It runs across four interconnected platforms:
 2. **Flutter Mobile App (Android/iOS):** Ultra-modular widget architecture, on-device rules engine (< 5ms), direct universal cloud LLMs (Groq, OpenRouter, Ollama), and hybrid race dispatcher.
 3. **Chrome / Edge Extension (Manifest V3):** Injectable suggestions, context menus, offline heuristics fallback, and direct cloud API integration.
 4. **Universal Node.js Express Backend:** SHA-256 caching, rate limiting, and unified `/v1/chat/completions` proxy with deterministic fallback.
+5. **Native HarmonyOS App (Stage Model ArkTS/ArkUI):** Zero-latency on-device heuristics, Huawei Watch GT & Watch 4 sync via `@ohos.notificationManager`, and `@ohos.net.http` cloud adapter.
 
 ---
 
@@ -208,12 +209,17 @@ smart-reply/
 │   ├── popup.html        # Clean, modern UI with mode tabs and settings view
 │   ├── popup.js          # Modular event controller and storage manager
 │   └── content.js        # Active editable field text inserter
-└── smart_reply_app/      # Production Flutter Application
-    ├── lib/models/       # engine_mode, provider_config, reply_suggestion, chat_message
-    ├── lib/services/     # heuristic_engine, cloud_llm_engine, hybrid_dispatcher, settings_storage
-    ├── lib/providers/    # chat_provider (ChangeNotifier)
-    ├── lib/widgets/      # modular components: common, selectors, input, results, dialogs
-    └── lib/screens/      # home_screen (clean composed architecture)
+├── smart_reply_app/      # Production Flutter Application
+│   ├── lib/models/       # engine_mode, provider_config, reply_suggestion, chat_message
+│   ├── lib/services/     # heuristic_engine, cloud_llm_engine, hybrid_dispatcher, settings_storage
+│   ├── lib/providers/    # chat_provider (ChangeNotifier)
+│   ├── lib/widgets/      # modular components: common, selectors, input, results, dialogs
+│   └── lib/screens/      # home_screen (clean composed architecture)
+└── harmonyos/            # Pure Native HarmonyOS Application (Stage Model, ArkTS, ArkUI)
+    ├── build-profile.json5 # Project build settings (API 12, Stage model)
+    ├── hvigorfile.ts     # Hvigor build automation entrypoint
+    ├── AppScope/         # Global bundle metadata & strings
+    └── entry/            # Primary feature module (UIAbility, Pages, ArkTS services)
 ```
 
 ---

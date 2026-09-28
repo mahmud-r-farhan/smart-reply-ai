@@ -1,0 +1,9 @@
+{
+  "modelVersion": "5.0.0",
+  "description": "Smart Reply AI - Native HarmonyOS (ArkTS / ArkUI) Application",
+  "dependencies": {},
+  "devDependencies": {
+    "@ohos/hypium": "1.0.16",
+    "@ohos/hvigor-ohos-plugin": "5.0.0"
+  }
+}
