@@ -1,49 +1,41 @@
 // CONSTANTS & ICONS
-
 const DEFAULT_BACKEND_URL = 'http://localhost:5006/api';
-const DEFAULT_FROM_LANG = 'auto';
-const DEFAULT_TO_LANG = 'english';
+const DEFAULT_PROVIDER = 'groq';
+const DEFAULT_ENGINE_MODE = 'hybrid';
 
 const icons = {
   spinner: `<svg class="icon icon-sm spinner" fill="none" viewBox="0 0 24 24">
     <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" opacity="0.25"/>
     <path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
   </svg>`,
-  
   copy: `<svg class="icon icon-sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
   </svg>`,
-  
   insert: `<svg class="icon icon-sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
   </svg>`,
-  
   check: `<svg class="icon icon-sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
   </svg>`,
-  
   lightning: `<svg class="icon icon-sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
   </svg>`
 };
 
-
 // STATE MANAGEMENT
-
 const state = {
   mode: 'reply',
+  engineMode: DEFAULT_ENGINE_MODE,
+  provider: DEFAULT_PROVIDER,
+  apiKey: '',
   backendUrl: DEFAULT_BACKEND_URL,
-  defaultFromLang: DEFAULT_FROM_LANG,
-  defaultToLang: DEFAULT_TO_LANG,
   isLoading: false
 };
 
-
-// UTILITY FUNCTIONS
-
+// UTILITIES
 const utils = {
-  $: (selector) => document.querySelector(selector),
-  $$: (selector) => document.querySelectorAll(selector),
+  $: (s) => document.querySelector(s),
+  $$: (s) => document.querySelectorAll(s),
   
   showView: (viewId) => {
     utils.$$('.view').forEach(v => v.classList.remove('active'));
@@ -60,29 +52,21 @@ const utils = {
     try {
       await navigator.clipboard.writeText(text);
       return true;
-    } catch (err) {
-      // Fallback method
+    } catch {
       const textarea = document.createElement('textarea');
       textarea.value = text;
       textarea.style.position = 'fixed';
       textarea.style.opacity = '0';
       document.body.appendChild(textarea);
       textarea.select();
-      try {
-        const success = document.execCommand('copy');
-        textarea.remove();
-        return success;
-      } catch (e) {
-        textarea.remove();
-        return false;
-      }
+      const success = document.execCommand('copy');
+      textarea.remove();
+      return success;
     }
   }
 };
 
-
 // COMPONENTS
-
 const components = {
   errorAlert: (message) => `
     <div class="alert alert-error">
@@ -90,37 +74,34 @@ const components = {
     </div>
   `,
 
+  emptyState: () => `
+    <div class="empty-state">
+      <svg class="icon icon-lg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+      </svg>
+      <p class="text-secondary text-sm">Suggestions will appear here</p>
+    </div>
+  `,
+
   suggestionCard: (text, index) => {
-    const escapedText = utils.escapeHtml(text);
+    const escaped = utils.escapeHtml(text);
     return `
       <div class="card" data-index="${index}">
-        <p class="card-text">${escapedText}</p>
+        <p class="card-text">${escaped}</p>
         <div class="card-actions">
-          <button class="btn btn-secondary btn-sm copy-btn" data-index="${index}">
+          <button class="btn btn-secondary btn-sm copy-btn" data-index="${index}" title="Copy">
             ${icons.copy}
-            Copy
+            <span>Copy</span>
           </button>
-          <button class="btn btn-primary btn-sm insert-btn" data-index="${index}">
+          <button class="btn btn-secondary btn-sm insert-btn" data-index="${index}" title="Insert into page field">
             ${icons.insert}
-            Insert
+            <span>Insert</span>
           </button>
         </div>
       </div>
     `;
-  },
-
-  emptyState: () => `
-    <div class="empty-state">
-      <svg class="empty-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-      </svg>
-      <p class="empty-text">Enter a message above and click<br>"Generate Suggestions" to get started</p>
-    </div>
-  `
+  }
 };
-
-
-// CHROME/BROWSER API WRAPPERS (CROSS-BROWSER)
 
 const api = (typeof chrome !== 'undefined' ? chrome : browser);
 
@@ -129,136 +110,91 @@ const chromeApi = {
     try {
       const [tab] = await api.tabs.query({ active: true, currentWindow: true });
       if (!tab) return '';
-      
-      try {
-        const result = await api.tabs.sendMessage(tab.id, { action: 'getSelectedText' });
-        return result?.text || '';
-      } catch (error) {
-        // Content script not loaded or not responding - return empty
-        console.log('Content script not available on this page');
-        return '';
-      }
-    } catch (error) {
+      const result = await api.tabs.sendMessage(tab.id, { action: 'getSelectedText' });
+      return result?.text || '';
+    } catch {
       return '';
     }
   },
 
   insertText: async (text) => {
-    try {
-      const [tab] = await api.tabs.query({ active: true, currentWindow: true });
-      if (!tab) throw new Error('No active tab found');
-      
-      try {
-        await api.tabs.sendMessage(tab.id, { action: 'insertText', text });
-        return true;
-      } catch (error) {
-        throw new Error('Could not insert text. Make sure you click in a text field first on a supported page.');
-      }
-    } catch (error) {
-      throw new Error(error.message || 'Could not insert text. Make sure you click in a text field first.');
-    }
+    const [tab] = await api.tabs.query({ active: true, currentWindow: true });
+    if (!tab) throw new Error('No active tab found');
+    await api.tabs.sendMessage(tab.id, { action: 'insertText', text });
+    return true;
   },
 
   loadSettings: async () => {
-    const cfg = await api.storage.sync.get({ 
-      backendUrl: DEFAULT_BACKEND_URL,
-      defaultFromLang: DEFAULT_FROM_LANG,
-      defaultToLang: DEFAULT_TO_LANG
+    return await api.storage.sync.get({
+      engineMode: DEFAULT_ENGINE_MODE,
+      provider: DEFAULT_PROVIDER,
+      apiKey: '',
+      backendUrl: DEFAULT_BACKEND_URL
     });
-    return cfg;
   },
 
   saveSettings: async (settings) => {
-    let { backendUrl, defaultFromLang, defaultToLang } = settings;
-    backendUrl = backendUrl.trim() || DEFAULT_BACKEND_URL;
-    backendUrl = backendUrl.replace(/\/$/, ''); // Remove trailing slash
-    
-    // Validate URL
-    try {
-      new URL(backendUrl);
-    } catch (e) {
-      throw new Error('Invalid URL. Please enter a valid URL (e.g., http://localhost:5006/api)');
-    }
-    
-    await api.storage.sync.set({ backendUrl, defaultFromLang, defaultToLang });
-    return { backendUrl, defaultFromLang, defaultToLang };
+    await api.storage.sync.set(settings);
+    return settings;
   },
 
   sendMessage: async (action, data) => {
-    const maxRetries = 5;
-    let lastError;
-    
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        return await api.runtime.sendMessage({ action, ...data });
-      } catch (error) {
-        lastError = error;
-        
-        // If it's a context invalidated error, don't retry
-        if (error.message.includes('Extension context invalidated')) {
-          throw new Error('Extension was updated. Please refresh the page.');
-        }
-        
-        // If it's the first attempt and connection doesn't exist, wait before retry
-        if (attempt < maxRetries - 1 && error.message.includes('Receiving end does not exist')) {
-          const delay = 150 * Math.pow(2, attempt);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        } else if (attempt === maxRetries - 1) {
-          break;
-        }
-      }
-    }
-    
-    console.error('Failed to communicate with background after retries:', lastError);
-    throw lastError || new Error('Failed to communicate with background service. Please try again.');
+    return await api.runtime.sendMessage({ action, ...data });
   }
 };
 
-
-// UI HANDLERS
-
+// UI CONTROLLER
 const ui = {
   setLoading: (loading) => {
     state.isLoading = loading;
     const btn = utils.$('#generateBtn');
     let modeText = 'Generating...';
     let normalText = 'Generate Suggestions';
+
     if (state.mode === 'enhance') {
       modeText = 'Enhancing...';
       normalText = 'Enhance Text';
     } else if (state.mode === 'translate') {
       modeText = 'Translating...';
       normalText = 'Translate Text';
+    } else if (state.mode === 'summarize') {
+      modeText = 'Summarizing...';
+      normalText = 'Summarize Text';
     }
-    
+
     btn.disabled = loading;
     btn.innerHTML = loading 
       ? `${icons.spinner} ${modeText}`
-      : `${icons.lightning} ${normalText}`;
+      : `${icons.lightning} <span>${normalText}</span>`;
   },
 
-  showResults: (results) => {
+  showResults: (results, telemetry) => {
     const container = utils.$('#resultsContainer');
-    
+    const telemetryBanner = utils.$('#telemetryBanner');
+    const telemetrySource = utils.$('#telemetrySource');
+    const telemetryLatency = utils.$('#telemetryLatency');
+
+    if (telemetry && telemetry.latencyMs) {
+      telemetryBanner.style.display = 'flex';
+      const isLocal = telemetry.source === 'heuristic';
+      telemetrySource.textContent = isLocal ? '⚡ On-Device Heuristic' : `☁️ Cloud (${telemetry.model || 'LLM'})`;
+      telemetrySource.style.color = isLocal ? '#34d399' : '#818cf8';
+      telemetryLatency.textContent = `${telemetry.latencyMs}ms`;
+    }
+
     if (!results || results.length === 0) {
-      container.innerHTML = '<p class="text-secondary text-sm" style="text-align: center; padding: 20px;">No results generated. Please try again.</p>';
+      container.innerHTML = '<p class="text-secondary text-sm" style="text-align:center; padding:20px;">No results. Please try again.</p>';
       return;
     }
 
-    container.innerHTML = results.map((text, index) => 
-      components.suggestionCard(text, index)
-    ).join('');
+    container.innerHTML = results.map((t, idx) => components.suggestionCard(t, idx)).join('');
 
-    // Store results in closure for event handlers
-    const resultTexts = results;
-
-    // Attach copy button listeners
+    // Attach copy button handlers
     utils.$$('.copy-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
-        const index = parseInt(e.currentTarget.dataset.index);
-        const text = resultTexts[index];
+        const idx = parseInt(e.currentTarget.dataset.index);
+        const text = results[idx];
         const success = await utils.copyToClipboard(text);
-        
         if (success) {
           const originalHTML = btn.innerHTML;
           btn.innerHTML = `${icons.check} Copied!`;
@@ -271,12 +207,11 @@ const ui = {
       });
     });
 
-    // Attach insert button listeners
+    // Attach insert button handlers
     utils.$$('.insert-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
-        const index = parseInt(e.currentTarget.dataset.index);
-        const text = resultTexts[index];
-        
+        const idx = parseInt(e.currentTarget.dataset.index);
+        const text = results[idx];
         try {
           await chromeApi.insertText(text);
           const originalHTML = btn.innerHTML;
@@ -286,8 +221,8 @@ const ui = {
             btn.innerHTML = originalHTML;
             btn.disabled = false;
           }, 2000);
-        } catch (error) {
-          alert(error.message);
+        } catch (err) {
+          alert(err.message || 'Could not insert text. Click inside a text box first.');
         }
       });
     });
@@ -303,45 +238,44 @@ const ui = {
     const inputField = utils.$('#inputText');
     const generateBtn = utils.$('#generateBtn');
     const langGroup = utils.$('#languageGroup');
-    const styleGroup = utils.$('.form-group:nth-child(2)'); // Style select group
-    
+
     langGroup.classList.add('hidden');
-    styleGroup.classList.remove('hidden');
-    
+
     if (state.mode === 'reply') {
       inputLabel.textContent = 'Message to Reply To';
       inputField.placeholder = 'Paste message or highlight text...';
-      generateBtn.innerHTML = `${icons.lightning} Generate Suggestions`;
+      generateBtn.innerHTML = `${icons.lightning} <span>Generate Suggestions</span>`;
     } else if (state.mode === 'enhance') {
       inputLabel.textContent = 'Text to Enhance';
       inputField.placeholder = 'Paste your text to enhance...';
-      generateBtn.innerHTML = `${icons.lightning} Enhance Text`;
+      generateBtn.innerHTML = `${icons.lightning} <span>Enhance Text</span>`;
     } else if (state.mode === 'translate') {
       inputLabel.textContent = 'Text to Translate';
       inputField.placeholder = 'Paste text to translate...';
-      generateBtn.innerHTML = `${icons.lightning} Translate Text`;
+      generateBtn.innerHTML = `${icons.lightning} <span>Translate Text</span>`;
       langGroup.classList.remove('hidden');
-      styleGroup.classList.add('hidden'); // Hide style for translate, or keep if needed
+    } else if (state.mode === 'summarize') {
+      inputLabel.textContent = 'Text to Summarize';
+      inputField.placeholder = 'Paste long message, email, or meeting notes...';
+      generateBtn.innerHTML = `${icons.lightning} <span>Summarize Text</span>`;
     }
   }
 };
 
-
-// EVENT HANDLERS
-
+// HANDLERS
 const handlers = {
   switchMode: (mode) => {
     state.mode = mode;
     utils.$$('.tab').forEach(tab => tab.classList.remove('active'));
-    utils.$(`#mode${mode.charAt(0).toUpperCase() + mode.slice(1)}`).classList.add('active');
+    const tabBtn = utils.$(`#mode${mode.charAt(0).toUpperCase() + mode.slice(1)}`);
+    if (tabBtn) tabBtn.classList.add('active');
     ui.updateModeUI();
-    utils.$('#resultsContainer').innerHTML = components.emptyState();
   },
 
   generate: async () => {
     const inputText = utils.$('#inputText').value.trim();
     const style = utils.$('#styleSelect').value;
-    const toLang = utils.$('#toLangSelect').value || state.defaultToLang;
+    const toLang = utils.$('#toLangSelect').value || 'spanish';
 
     if (!inputText) {
       ui.showError('Please enter some text first');
@@ -349,137 +283,115 @@ const handlers = {
     }
 
     ui.setLoading(true);
-    utils.$('#resultsContainer').innerHTML = '';
 
     try {
       const response = await chromeApi.sendMessage('getResults', {
         input: inputText,
-        style: style,
+        style,
         mode: state.mode,
-        from_lang: state.defaultFromLang, // Not used in backend, but pass if needed
         to_lang: toLang
       });
 
-      if (response?.results && response.results.length > 0) {
-        ui.showResults(response.results);
-      } else if (response?.error) {
-        ui.showError(response.error);
+      if (response && response.results) {
+        ui.showResults(response.results, {
+          latencyMs: response.latencyMs || 2,
+          source: response.source || 'heuristic',
+          model: response.model
+        });
       } else {
-        ui.showResults([]);
+        ui.showError(response?.error || 'Failed to generate suggestions');
       }
-    } catch (error) {
-      ui.showError(error.message || 'An unexpected error occurred');
+    } catch (err) {
+      ui.showError(err.message || 'Error communicating with extension background.');
     } finally {
       ui.setLoading(false);
     }
   },
 
-  openSettings: () => {
-    utils.$('#backendUrlInput').value = state.backendUrl;
-    utils.$('#defaultFromLang').value = state.defaultFromLang;
-    utils.$('#defaultToLang').value = state.defaultToLang;
+  openSettings: async () => {
+    const settings = await chromeApi.loadSettings();
+    utils.$('#engineModeSelect').value = settings.engineMode || 'hybrid';
+    utils.$('#providerSelect').value = settings.provider || 'groq';
+    utils.$('#apiKeyInput').value = settings.apiKey || '';
+    utils.$('#backendUrlInput').value = settings.backendUrl || DEFAULT_BACKEND_URL;
     utils.showView('settingsView');
   },
 
-  closeSettings: () => {
-    utils.showView('mainView');
-  },
-
   saveSettings: async () => {
-    const backendUrl = utils.$('#backendUrlInput').value;
-    const defaultFromLang = utils.$('#defaultFromLang').value;
-    const defaultToLang = utils.$('#defaultToLang').value;
-    
-    try {
-      const saved = await chromeApi.saveSettings({ backendUrl, defaultFromLang, defaultToLang });
-      Object.assign(state, saved);
-      handlers.closeSettings();
-    } catch (error) {
-      alert(error.message);
-    }
-  },
+    const engineMode = utils.$('#engineModeSelect').value;
+    const provider = utils.$('#providerSelect').value;
+    const apiKey = utils.$('#apiKeyInput').value.trim();
+    const backendUrl = utils.$('#backendUrlInput').value.trim() || DEFAULT_BACKEND_URL;
 
-  loadSettings: async () => {
-    const settings = await chromeApi.loadSettings();
-    Object.assign(state, settings);
-    utils.$('#backendUrlInput').value = state.backendUrl;
-    utils.$('#defaultFromLang').value = state.defaultFromLang;
-    utils.$('#defaultToLang').value = state.defaultToLang;
+    let baseURL = 'https://api.groq.com/openai/v1';
+    let model = 'llama-3.1-8b-instant';
+
+    if (provider === 'openrouter') {
+      baseURL = 'https://openrouter.ai/api/v1';
+      model = 'meta-llama/llama-3.3-70b-instruct:free';
+    } else if (provider === 'ollama') {
+      baseURL = 'http://localhost:11434/v1';
+      model = 'llama3.2:latest';
+    }
+
+    await chromeApi.saveSettings({
+      engineMode,
+      provider,
+      apiKey,
+      baseURL,
+      model,
+      backendUrl
+    });
+
+    state.engineMode = engineMode;
+    state.provider = provider;
+    state.apiKey = apiKey;
+
+    const badge = utils.$('#engineBadge');
+    if (badge) {
+      badge.textContent = engineMode === 'offline' ? 'OFFLINE 🔒' : engineMode === 'cloud' ? 'CLOUD ☁️' : 'HYBRID ⚡';
+    }
+
+    utils.showView('mainView');
   }
 };
 
-
 // INITIALIZATION
-
-const init = async () => {
-  // Load settings
-  await handlers.loadSettings();
-
-  // Check for pending action (e.g., from context menu or shortcut)
-  let handledPending = false;
-  try {
-    const pending = await api.storage.local.get('pendingAction');
-    if (pending.pendingAction) {
-      const { mode, input } = pending.pendingAction;
-      if (mode === 'translate' && input) {
-        utils.$('#inputText').value = input;
-        handlers.switchMode('translate');
-        utils.$('#toLangSelect').value = state.defaultToLang;
-        await handlers.generate();
-        handledPending = true;
-      }
-      await api.storage.local.remove('pendingAction');
-    }
-  } catch (error) {
-    console.error('Error checking pending action:', error);
-  }
-
-  // If no pending, try to get selected text from page
-  if (!handledPending) {
-    try {
-      const selectedText = await chromeApi.getSelectedText();
-      if (selectedText) {
-        utils.$('#inputText').value = selectedText;
-      }
-    } catch (error) {
-      console.log('Could not get selected text:', error);
-    }
-  }
-
-  // Mode switching
+document.addEventListener('DOMContentLoaded', async () => {
+  // Tab listeners
   utils.$('#modeReply').addEventListener('click', () => handlers.switchMode('reply'));
   utils.$('#modeEnhance').addEventListener('click', () => handlers.switchMode('enhance'));
   utils.$('#modeTranslate').addEventListener('click', () => handlers.switchMode('translate'));
+  utils.$('#modeSummarize').addEventListener('click', () => handlers.switchMode('summarize'));
 
-  // Generate button
+  // Button listeners
   utils.$('#generateBtn').addEventListener('click', handlers.generate);
-
-  // Navigation
   utils.$('#settingsBtn').addEventListener('click', handlers.openSettings);
-  utils.$('#backBtn').addEventListener('click', handlers.closeSettings);
+  utils.$('#backBtn').addEventListener('click', () => utils.showView('mainView'));
   utils.$('#saveBtn').addEventListener('click', handlers.saveSettings);
 
-  // Keyboard shortcuts in popup
+  // Keyboard shortcut Ctrl/Cmd+Enter
   utils.$('#inputText').addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
       handlers.generate();
     }
   });
 
-  // Set initial mode
-  if (!handledPending) {
-    handlers.switchMode('reply');
-  }
-  
-  // Show empty state if no results
-  if (!handledPending) {
-    ui.showResults([]);
-  }
-};
+  // Auto-fill selected text or pending action
+  try {
+    const localData = await api.storage.local.get(['pendingAction']);
+    if (localData?.pendingAction) {
+      const { mode, input } = localData.pendingAction;
+      if (mode) handlers.switchMode(mode);
+      if (input) utils.$('#inputText').value = input;
+      await api.storage.local.remove(['pendingAction']);
+      return;
+    }
 
-// Start the app
-init().catch(error => {
-  console.error('Initialization error:', error);
-  handlers.switchMode('reply');
-  ui.showResults([]);
+    const selectedText = await chromeApi.getSelectedText();
+    if (selectedText) {
+      utils.$('#inputText').value = selectedText;
+    }
+  } catch {}
 });

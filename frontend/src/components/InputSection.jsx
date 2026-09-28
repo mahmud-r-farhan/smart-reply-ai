@@ -1,12 +1,32 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { Zap, Trash2 } from "lucide-react";
+import { Zap, Trash2, Clipboard, Sparkles } from "lucide-react";
 import TextareaAutoResize from "./TextareaAutoResize";
+
+const SAMPLE_PROMPTS = {
+  reply: [
+    "Can we meet tomorrow at 3 PM?",
+    "Thanks for the quick turnaround on the project!",
+    "Sorry for the delay in following up."
+  ],
+  enhance: [
+    "i want to know if you can finish this by tomorrow let me know",
+    "we need to discuss about the budget problem asap"
+  ],
+  translate: [
+    "Hello, it is a pleasure to meet you.",
+    "Thank you very much for your kind support."
+  ],
+  summarize: [
+    "The engineering team delivered the Q3 migration to multi-cloud. Customer latency dropped by 45%. System availability remained at 99.99%. Next sprint targets on-device ML caching."
+  ]
+};
 
 const InputSection = ({ input, setInput, handleSubmit, loading, error, clear, mode }) => {
   let placeholder = "Paste the message you received here... (Ctrl/Cmd + Enter to generate)";
   let buttonText = "Generate Replies";
   let loadingText = "Generating...";
+
   if (mode === "enhance") {
     placeholder = "Paste your text to enhance here... (Ctrl/Cmd + Enter to enhance)";
     buttonText = "Enhance Text";
@@ -15,24 +35,63 @@ const InputSection = ({ input, setInput, handleSubmit, loading, error, clear, mo
     placeholder = "Paste text to translate here... (Ctrl/Cmd + Enter to translate)";
     buttonText = "Translate Text";
     loadingText = "Translating...";
+  } else if (mode === "summarize") {
+    placeholder = "Paste long conversation, email, or meeting notes to summarize... (Ctrl/Cmd + Enter)";
+    buttonText = "Summarize Text";
+    loadingText = "Summarizing...";
   }
+
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) setInput(text);
+    } catch {}
+  };
+
+  const samples = SAMPLE_PROMPTS[mode] || SAMPLE_PROMPTS.reply;
 
   return (
     <div className="p-6">
+      {/* Sample prompts */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-3 mb-1 no-scrollbar">
+        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap flex items-center gap-1">
+          <Sparkles className="w-3 h-3 text-indigo-400" /> Samples:
+        </span>
+        {samples.map((sample, i) => (
+          <button
+            key={i}
+            onClick={() => setInput(sample)}
+            className="text-xs px-2.5 py-1 rounded-lg bg-slate-800/70 hover:bg-slate-700/80 text-slate-400 hover:text-slate-200 border border-slate-700/50 whitespace-nowrap transition"
+          >
+            {sample.length > 38 ? `${sample.slice(0, 38)}...` : sample}
+          </button>
+        ))}
+      </div>
+
       <div className="relative">
         <TextareaAutoResize
-          className="w-full min-h-[120px] max-h-[300px] p-4 bg-slate-800/50 border border-slate-700 rounded-2xl text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent overflow-hidden transition-all"
+          className="w-full min-h-[120px] max-h-[320px] p-4 bg-slate-800/50 border border-slate-700 rounded-2xl text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent overflow-hidden transition-all text-sm leading-relaxed"
           placeholder={placeholder}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
               handleSubmit();
             }
           }}
         />
-        <div className="absolute bottom-4 right-4 text-xs text-slate-500">
-          {input.length} / 2000
+        <div className="absolute bottom-3 right-4 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handlePaste}
+            className="text-xs text-slate-400 hover:text-indigo-400 transition flex items-center gap-1"
+            title="Paste from clipboard"
+          >
+            <Clipboard className="w-3.5 h-3.5" /> Paste
+          </button>
+          <span className="text-xs text-slate-500">
+            {input.length} / 3000
+          </span>
         </div>
       </div>
 

@@ -2,6 +2,8 @@ import { motion } from "framer-motion";
 import { useState, useCallback, useMemo } from "react";
 import { useChatStore } from "./store/useChatStore";
 import Header from "./components/Header.jsx";
+import EngineModeSelector from "./components/EngineModeSelector.jsx";
+import ProviderModal from "./components/ProviderModal.jsx";
 import ModeSelector from "./components/ModeSelector.jsx";
 import StyleSelector from "./components/StyleSelector.jsx";
 import LanguageSelector from "./components/LanguageSelector.jsx";
@@ -12,9 +14,32 @@ import Footer from "./components/Footer.jsx";
 import PWAInstallPrompt from "./components/PWAInstallPrompt.jsx";
 
 export default function App() {
-  const { input, results, loading, style, mode, language, error, setInput, setStyle, setMode, setLanguage, getResults, clear } = useChatStore();
+  const {
+    input,
+    results,
+    loading,
+    style,
+    mode,
+    language,
+    error,
+    latencyMs,
+    source,
+    model,
+    engineMode,
+    providerConfig,
+    setInput,
+    setStyle,
+    setMode,
+    setLanguage,
+    setEngineMode,
+    setProviderConfig,
+    getResults,
+    clear
+  } = useChatStore();
+
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [showStyleInfo, setShowStyleInfo] = useState(false);
+  const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
 
   const handleSubmit = useCallback(async () => {
     if (!input.trim()) return;
@@ -61,17 +86,33 @@ export default function App() {
       {backgroundAnimation}
       <PWAInstallPrompt />
 
+      <ProviderModal
+        isOpen={isProviderModalOpen}
+        onClose={() => setIsProviderModalOpen(false)}
+        currentConfig={providerConfig}
+        onSave={(newConfig) => setProviderConfig(newConfig)}
+      />
+
       <div className="relative max-w-5xl mx-auto">
-        <Header />
+        <Header onOpenProviderSettings={() => setIsProviderModalOpen(true)} />
 
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
+          initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 rounded-3xl shadow-2xl overflow-hidden"
+          transition={{ duration: 0.4, delay: 0.1 }}
+          className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-3xl shadow-2xl overflow-hidden"
         >
+          {/* Engine Mode selector: Hybrid Race, On-Device, Cloud */}
+          <EngineModeSelector
+            activeMode={engineMode}
+            onModeChange={setEngineMode}
+            onOpenSettings={() => setIsProviderModalOpen(true)}
+          />
+
+          {/* Mode Selector: Reply, Enhance, Translate, Summarize */}
           <ModeSelector mode={mode} setMode={setMode} />
 
+          {/* Style / Tone Selector */}
           <StyleSelector 
             style={style} 
             setStyle={setStyle} 
@@ -79,6 +120,7 @@ export default function App() {
             setShowStyleInfo={setShowStyleInfo} 
           />
 
+          {/* Language Selector for translation */}
           {shouldShowLanguageSelector && (
             <LanguageSelector 
               language={language} 
@@ -86,6 +128,7 @@ export default function App() {
             />
           )}
 
+          {/* Input Area */}
           <InputSection 
             input={input} 
             setInput={setInput} 
@@ -96,6 +139,7 @@ export default function App() {
             mode={mode}
           />
 
+          {/* Results Area with Latency Badge */}
           <ResultsSection 
             results={results} 
             loading={loading} 
@@ -104,6 +148,9 @@ export default function App() {
             setCopiedIndex={setCopiedIndex} 
             handleCopy={handleCopy} 
             mode={mode}
+            latencyMs={latencyMs}
+            source={source}
+            model={model}
           />
 
           <EmptyState loading={loading} results={results} input={input} />
@@ -113,4 +160,4 @@ export default function App() {
       </div>
     </div>
   );
-};
+}

@@ -1,6 +1,6 @@
 import React, { memo, useMemo } from "react";
 import { motion } from "framer-motion";
-import { MessageSquare, Edit, Languages } from "lucide-react";
+import { MessageSquare, Edit, Languages, FileText } from "lucide-react";
 
 const ModeSelector = memo(({ mode, setMode }) => {
   const modes = useMemo(
@@ -8,13 +8,14 @@ const ModeSelector = memo(({ mode, setMode }) => {
       { value: "reply", label: "Smart Reply", icon: MessageSquare, description: "Generate replies to received messages" },
       { value: "enhance", label: "Smart Enhance", icon: Edit, description: "Improve your own text like Grammarly" },
       { value: "translate", label: "Smart Translate", icon: Languages, description: "Translate text with style" },
+      { value: "summarize", label: "Smart Summarize", icon: FileText, description: "Condense long text and emails" },
     ],
     []
   );
 
   return (
     <div className="p-6 border-b border-slate-800 bg-slate-900/50">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {modes.map((m) => (
           <motion.button
             key={m.value}

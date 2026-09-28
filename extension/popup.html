@@ -3,18 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Suggest Smart Reply | AI-Powered Writing Assistant for Fast, Smart Replies and Translations</title>
+  <title>Smart Reply AI Assistant</title>
   <link rel="stylesheet" href="popup.css" />
 </head>
 
 <body>
- <!-- Main View -->
+  <!-- Main View -->
   <div id="mainView" class="view active">
     <div class="container stack">
       <!-- Header -->
       <header class="header">
-        <h1 class="header-title">Instant Write & Translate</h1>
-        <button id="settingsBtn" class="btn btn-ghost btn-icon" aria-label="Settings">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <h1 class="header-title">Smart Reply AI</h1>
+          <span id="engineBadge" style="font-size:10px; font-weight:700; padding:2px 6px; border-radius:10px; background:rgba(99,102,241,0.2); color:#a5b4fc; border:1px solid rgba(99,102,241,0.3);">HYBRID ⚡</span>
+        </div>
+        <button id="settingsBtn" class="btn btn-ghost btn-icon" aria-label="Settings" title="Configure AI Provider">
           <svg class="icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -27,6 +30,7 @@
         <button id="modeReply" class="tab active">Reply</button>
         <button id="modeEnhance" class="tab">Enhance</button>
         <button id="modeTranslate" class="tab">Translate</button>
+        <button id="modeSummarize" class="tab">Summarize</button>
       </div>
 
       <!-- Form -->
@@ -42,27 +46,28 @@
         </div>
 
         <div class="form-group">
-          <label class="label" for="styleSelect">Tone</label>
+          <label class="label" for="styleSelect">Tone / Style</label>
           <select id="styleSelect" class="select" aria-label="Tone">
-            <option value="professional">Professional</option>
-            <option value="friendly">Friendly</option>
-            <option value="casual">Casual</option>
-            <option value="formal">Formal</option>
-            <option value="flating">Flating</option>
-            <option value="romantic">Romantic</option>
+            <option value="professional">💼 Professional</option>
+            <option value="friendly">😊 Friendly</option>
+            <option value="casual">👋 Casual</option>
+            <option value="concise">⚡ Concise</option>
+            <option value="formal">🎩 Formal</option>
+            <option value="flating">😏 Flirty</option>
+            <option value="romantic">💕 Romantic</option>
           </select>
         </div>
 
         <div id="languageGroup" class="form-group hidden">
           <label class="label" for="toLangSelect">Target Language</label>
           <select id="toLangSelect" class="select" aria-label="Target Language">
-            <option value="english">English</option>
-            <option value="spanish">Spanish</option>
-            <option value="french">French</option>
-            <option value="german">German</option>
-            <option value="chinese">Chinese</option>
-            <option value="arabic">Arabic</option>
-            <option value="bengali">Bengali</option>
+            <option value="spanish">🇪🇸 Spanish</option>
+            <option value="french">🇫🇷 French</option>
+            <option value="german">🇩🇪 German</option>
+            <option value="bengali">🇧🇩 Bengali</option>
+            <option value="chinese">🇨🇳 Chinese</option>
+            <option value="arabic">🇸🇦 Arabic</option>
+            <option value="english">🇺🇸 English</option>
           </select>
         </div>
 
@@ -70,8 +75,14 @@
           <svg class="icon icon-sm" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
-          Generate Suggestions
+          <span id="generateBtnText">Generate Suggestions</span>
         </button>
+      </div>
+
+      <!-- Telemetry banner -->
+      <div id="telemetryBanner" style="display:none; font-size:11px; color:#94a3b8; justify-content:space-between; align-items:center; padding:2px 4px;">
+        <span id="telemetrySource">⚡ On-Device</span>
+        <span id="telemetryLatency">4ms</span>
       </div>
 
       <!-- Results -->
@@ -89,45 +100,47 @@
               <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
             </svg>
           </button>
-          <h1 class="header-title">Settings</h1>
+          <h1 class="header-title">Settings & Engine</h1>
         </div>
       </header>
 
       <div class="form-group">
-        <label class="label" for="backendUrlInput">Backend API Base URL</label>
+        <label class="label" for="engineModeSelect">Engine Operating Mode</label>
+        <select id="engineModeSelect" class="select">
+          <option value="hybrid">⚡ Hybrid Race (Zero Latency + Fast Cloud)</option>
+          <option value="offline">🔒 On-Device Heuristics Only (100% Private, 0ms)</option>
+          <option value="cloud">☁️ Cloud LLM Only</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="label" for="providerSelect">AI Provider</label>
+        <select id="providerSelect" class="select">
+          <option value="groq">Groq (Ultra-Fast LPU)</option>
+          <option value="openrouter">OpenRouter (Multi-Model)</option>
+          <option value="ollama">Ollama (Local / LAN Server)</option>
+          <option value="backend">Self-Hosted Backend API</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="apiKeyGroup">
+        <label class="label" for="apiKeyInput">API Key (Stored locally in browser)</label>
+        <input
+          type="password"
+          id="apiKeyInput"
+          class="input"
+          placeholder="gsk_... or sk-or-v1-..."
+        />
+      </div>
+
+      <div class="form-group" id="backendUrlGroup">
+        <label class="label" for="backendUrlInput">Backend API URL</label>
         <input
           type="url"
           id="backendUrlInput"
           class="input"
           placeholder="http://localhost:5006/api"
         />
-      </div>
-
-      <div class="form-group">
-        <label class="label" for="defaultFromLang">Default Source Language</label>
-        <select id="defaultFromLang" class="select">
-          <option value="auto">Auto Detect</option>
-          <option value="english">English</option>
-          <option value="spanish">Spanish</option>
-          <option value="french">French</option>
-          <option value="german">German</option>
-          <option value="chinese">Chinese</option>
-          <option value="arabic">Arabic</option>
-          <option value="bengali">Bengali</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label class="label" for="defaultToLang">Default Target Language</label>
-        <select id="defaultToLang" class="select">
-          <option value="english">English</option>
-          <option value="spanish">Spanish</option>
-          <option value="french">French</option>
-          <option value="german">German</option>
-          <option value="chinese">Chinese</option>
-          <option value="arabic">Arabic</option>
-          <option value="bengali">Bengali</option>
-        </select>
       </div>
 
       <button id="saveBtn" class="btn btn-primary btn-full">
@@ -138,7 +151,6 @@
       </button>
     </div>
   </div>
-
 
   <script src="popup.js"></script>
 </body>
