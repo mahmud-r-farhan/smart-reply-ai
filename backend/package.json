@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
+    "start:cluster": "node cluster.js",
     "dev": "nodemon server.js",
     "test": "node --test test/*.test.js"
   },

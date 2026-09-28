@@ -2,12 +2,17 @@ import express from "express";
 import cors from "cors";
 import compression from "compression";
 import dotenv from "dotenv";
+import process from "node:process";
 import apiRoutes from "./routes/apiRoutes.js";
+import cacheManager from "./utils/cacheManager.js";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5006;
+
+// Enable reverse proxy trust (Nginx, Cloudflare, AWS ALB, K8s Ingress)
+app.set("trust proxy", true);
 
 // Middleware
 app.use(cors());
@@ -27,9 +32,39 @@ app.use((req, res, next) => {
 // Routes
 app.use("/api", apiRoutes);
 
-// Health check endpoint
+// Liveness Probe (Kubernetes / Docker)
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  const mem = process.memoryUsage();
+  res.json({ 
+    status: "ok", 
+    service: "smart-reply-backend",
+    pid: process.pid,
+    uptimeSeconds: Math.floor(process.uptime()),
+    memoryMb: {
+      rss: Math.round(mem.rss / 1024 / 1024),
+      heapUsed: Math.round(mem.heapUsed / 1024 / 1024),
+    },
+    timestamp: new Date().toISOString() 
+  });
+});
+
+// Readiness Probe (Ensures worker is ready to handle traffic)
+app.get("/ready", (req, res) => {
+  res.json({
+    ready: true,
+    pid: process.pid,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Real-time Cache & Performance Telemetry
+app.get("/api/stats", (req, res) => {
+  res.json({
+    pid: process.pid,
+    uptimeSeconds: Math.floor(process.uptime()),
+    cache: cacheManager.getStats(),
+    memory: process.memoryUsage(),
+  });
 });
 
 // 404 handler

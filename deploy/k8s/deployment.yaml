@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smart-reply-backend
+  namespace: default
+  labels:
+    app.kubernetes.io/name: smart-reply-backend
+    app.kubernetes.io/component: api
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: smart-reply-backend
+  template:
+    metadata:
+      labels:
+        app: smart-reply-backend
+    spec:
+      containers:
+        - name: backend
+          image: smart-reply-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5006
+              name: http
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "5006"
+            - name: WORKERS
+              value: "2"
+            - name: OPENROUTER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: smart-reply-secrets
+                  key: openrouter-api-key
+                  optional: true
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5006
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 5006
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 2

@@ -1,0 +1,82 @@
+services:
+  # ==============================================================
+  # Nginx Reverse Proxy & Load Balancer (Least-Connection Routing)
+  # ==============================================================
+  load_balancer:
+    image: nginx:alpine
+    container_name: smart_reply_lb
+    restart: always
+    ports:
+      - "5006:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - smart_network
+
+  # ==============================================================
+  # Scalable Smart Reply Microservice (Horizontally Scaled Replicas)
+  # ==============================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - PORT=5006
+      - NODE_ENV=production
+      - WORKERS=2
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://openrouter.ai/api/v1}
+      - REDIS_URL=redis://cache:6379
+    expose:
+      - "5006"
+    deploy:
+      mode: replicated
+      replicas: 3 # Default 3 container replicas behind load balancer
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5006/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      cache:
+        condition: service_healthy
+    networks:
+      - smart_network
+
+  # ==============================================================
+  # Distributed Cache & Fast Key-Value Store (Redis LRU)
+  # ==============================================================
+  cache:
+    image: redis:7-alpine
+    container_name: smart_reply_redis
+    restart: always
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save 60 1
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - smart_network
+
+networks:
+  smart_network:
+    driver: bridge
+
+volumes:
+  redis_data:
+    driver: local

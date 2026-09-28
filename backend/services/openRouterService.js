@@ -1,4 +1,5 @@
 import cacheManager from "../utils/cacheManager.js";
+import singleflight from "../utils/singleflight.js";
 import { 
   getDefaultModel, 
   getFormatInstruction, 
@@ -59,7 +60,10 @@ export const callUniversalLlm = async ({
     };
   }
 
-  let lastError = null;
+  // Deduplicate concurrent identical requests with Singleflight
+  const flightKey = `${resolvedBaseURL}::${resolvedModel}::${operationType}::${cacheKey}`;
+  return await singleflight.do(flightKey, async () => {
+    let lastError = null;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -188,6 +192,7 @@ export const callUniversalLlm = async ({
     latencyMs: Date.now() - startTime,
     model: "heuristic-fallback"
   };
+  });
 };
 
 /**

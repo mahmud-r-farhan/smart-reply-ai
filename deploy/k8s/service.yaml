@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: smart-reply-service
+  namespace: default
+  labels:
+    app.kubernetes.io/name: smart-reply-backend
+spec:
+  type: ClusterIP
+  selector:
+    app: smart-reply-backend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 5006
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: smart-reply-loadbalancer
+  namespace: default
+  labels:
+    app.kubernetes.io/name: smart-reply-backend
+spec:
+  type: LoadBalancer
+  selector:
+    app: smart-reply-backend
+  ports:
+    - name: http
+      port: 5006
+      targetPort: 5006
+      protocol: TCP
