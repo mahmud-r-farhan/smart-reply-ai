@@ -138,8 +138,8 @@ jobs:
       - name: Package Linux Bundle
         run: |
           mkdir -p dist
-          cd smart_reply_app/build/linux/x64/release/bundle
-          tar -czvf ../../../../../dist/smart-reply-linux-x64.tar.gz .
+          BUNDLE_DIR=$(find smart_reply_app/build/linux -type d -name "bundle" | head -n 1)
+          tar -czvf dist/smart-reply-linux-x64.tar.gz -C "$BUNDLE_DIR" .
 
       - name: Upload Linux Artifact
         uses: actions/upload-artifact@v4
@@ -177,7 +177,11 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist
-          Compress-Archive -Path smart_reply_app\build\windows\x64\runner\Release\* -DestinationPath dist\smart-reply-flutter-windows-x64.zip
+          $releaseDir = Get-Item "smart_reply_app\build\windows\x64\runner\Release", "smart_reply_app\build\windows\runner\Release" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $releaseDir) {
+            $releaseDir = Get-ChildItem -Path "smart_reply_app\build\windows" -Directory -Recurse | Where-Object { $_.Name -eq "Release" } | Select-Object -First 1
+          }
+          Compress-Archive -Path "$($releaseDir.FullName)\*" -DestinationPath dist\smart-reply-flutter-windows-x64.zip
 
       - name: Upload Windows Flutter Artifact
         uses: actions/upload-artifact@v4
@@ -253,8 +257,9 @@ jobs:
       - name: Package macOS App
         run: |
           mkdir -p dist
-          cd smart_reply_app/build/macos/Build/Products/Release
-          zip -r ../../../../../dist/smart-reply-macos-universal.zip smart_reply_app.app
+          APP_DIR=$(find smart_reply_app/build/macos -type d -name "smart_reply_app.app" | head -n 1)
+          cd "$(dirname "$APP_DIR")"
+          zip -r "$GITHUB_WORKSPACE/dist/smart-reply-macos-universal.zip" smart_reply_app.app
 
       - name: Build iOS App Bundle (Unsigned)
         working-directory: smart_reply_app
@@ -262,10 +267,13 @@ jobs:
 
       - name: Package iOS IPA (Payload Structure for Sideloading)
         run: |
-          cd smart_reply_app/build/ios/iphoneos
-          mkdir -p Payload
-          cp -r Runner.app Payload/
-          zip -r ../../../../dist/smart-reply-ios-unsigned.ipa Payload
+          IOS_APP_DIR=$(find smart_reply_app/build/ios -type d -name "Runner.app" | head -n 1)
+          if [ -n "$IOS_APP_DIR" ]; then
+            mkdir -p /tmp/Payload
+            cp -r "$IOS_APP_DIR" /tmp/Payload/
+            cd /tmp
+            zip -r "$GITHUB_WORKSPACE/dist/smart-reply-ios-unsigned.ipa" Payload
+          fi
 
       - name: Upload Apple Artifacts
         uses: actions/upload-artifact@v4
