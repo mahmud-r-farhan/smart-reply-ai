@@ -123,6 +123,35 @@ Ensure your watch is paired with your phone:
 - **`WearableNotificationListenerService.kt`**:
   Inherits from Android's `NotificationListenerService`. Intercepts incoming messages from supported messaging packages (`com.whatsapp`, `org.telegram.messenger`, `com.google.android.apps.messaging`, `com.Slack`, etc.), runs the heuristic engine in `< 1ms`, and pushes smart reply notifications to the wearable.
 
+### iOS & Apple watchOS Swift Bridge
+
+- **`AppDelegate.swift`**:
+  ```swift
+  // Creates quick reply buttons displayed directly on Apple Watch screen
+  for (index, reply) in replies.prefix(4).enumerated() {
+    let action = UNNotificationAction(
+      identifier: "SMART_REPLY_ACTION_\(index)",
+      title: reply,
+      options: [] // Non-foreground: user replies directly on watch face
+    )
+    actions.append(action)
+  }
+  
+  // Adds Apple Watch Scribble & Dictation action
+  let textInputAction = UNTextInputNotificationAction(
+    identifier: "SMART_REPLY_ACTION_CUSTOM",
+    title: "Dictate / Type...",
+    options: [],
+    textInputButtonTitle: "Send",
+    textInputPlaceholder: "Reply to \(sender)"
+  )
+  actions.append(textInputAction)
+  ```
+- **`WCSessionDelegate` & `WatchConnectivity`**:
+  Activates `WCSession` for direct communication between iPhone and paired Apple Watch, allowing companion watch complications or SwiftUI watch apps to fetch smart replies and return selections with zero lag.
+- **`UNUserNotificationCenterDelegate`**:
+  Handles `userNotificationCenter(_:didReceive:)` when the user taps any quick reply or dictates a response on their Apple Watch, immediately dispatching it to Flutter via `FlutterMethodChannel`.
+
 ### Flutter Dart Bridge
 
 - **`WatchBridgeService`** (`lib/services/watch_bridge_service.dart`):

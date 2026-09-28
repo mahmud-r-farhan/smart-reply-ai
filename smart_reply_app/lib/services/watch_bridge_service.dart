@@ -60,7 +60,8 @@ class WatchBridgeService {
               .take(3)
               .toList();
 
-      if (defaultTargetPlatform == TargetPlatform.android) {
+      if (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS) {
         final result = await _channel.invokeMethod<bool>('postWatchNotification', {
           'sender': sender,
           'message': message,
@@ -75,9 +76,12 @@ class WatchBridgeService {
     }
   }
 
-  /// Check if the phone has granted Notification Listener permission
+  /// Check if the device has granted Notification permissions
   static Future<bool> isNotificationListenerEnabled() async {
-    if (defaultTargetPlatform != TargetPlatform.android) return false;
+    if (defaultTargetPlatform != TargetPlatform.android &&
+        defaultTargetPlatform != TargetPlatform.iOS) {
+      return false;
+    }
     try {
       final result = await _channel.invokeMethod<bool>('isNotificationListenerEnabled');
       return result ?? false;
@@ -86,9 +90,12 @@ class WatchBridgeService {
     }
   }
 
-  /// Open Android system settings to enable notification access
+  /// Open system settings to enable notification access
   static Future<void> openNotificationListenerSettings() async {
-    if (defaultTargetPlatform != TargetPlatform.android) return;
+    if (defaultTargetPlatform != TargetPlatform.android &&
+        defaultTargetPlatform != TargetPlatform.iOS) {
+      return;
+    }
     try {
       await _channel.invokeMethod('openNotificationListenerSettings');
     } catch (e) {
