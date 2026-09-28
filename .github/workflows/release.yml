@@ -1,0 +1,396 @@
+name: Build & Release Multiplatform Distribution
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (e.g. v1.0.0)'
+        required: false
+        default: 'v1.0.0'
+      draft:
+        description: 'Create Draft Release'
+        type: boolean
+        default: false
+      prerelease:
+        description: 'Mark as Pre-release'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # ==============================================================
+  # 1. Flutter Android APK Build
+  # ==============================================================
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        working-directory: smart_reply_app
+        run: flutter pub get
+
+      - name: Build Release APK
+        working-directory: smart_reply_app
+        run: flutter build apk --release --no-tree-shake-icons
+
+      - name: Prepare Artifact
+        run: |
+          mkdir -p dist
+          cp smart_reply_app/build/app/outputs/flutter-apk/app-release.apk dist/smart-reply-android-release.apk
+
+      - name: Upload Android Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: dist/smart-reply-android-release.apk
+          if-no-files-found: error
+
+  # ==============================================================
+  # 2. Flutter Web Bundle Build
+  # ==============================================================
+  build-web:
+    name: Build Web Client
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        working-directory: smart_reply_app
+        run: flutter pub get
+
+      - name: Build Flutter Web
+        working-directory: smart_reply_app
+        run: flutter build web --release --no-tree-shake-icons
+
+      - name: Package Web Distribution
+        run: |
+          mkdir -p dist
+          cd smart_reply_app/build/web
+          zip -r ../../../dist/smart-reply-web.zip .
+
+      - name: Upload Web Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-bundle
+          path: dist/smart-reply-web.zip
+          if-no-files-found: error
+
+  # ==============================================================
+  # 3. Flutter Linux Desktop Package
+  # ==============================================================
+  build-linux:
+    name: Build Linux Desktop (x64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Linux Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        working-directory: smart_reply_app
+        run: flutter pub get
+
+      - name: Build Linux Desktop
+        working-directory: smart_reply_app
+        run: flutter build linux --release
+
+      - name: Package Linux Bundle
+        run: |
+          mkdir -p dist
+          cd smart_reply_app/build/linux/x64/release/bundle
+          tar -czvf ../../../../../dist/smart-reply-linux-x64.tar.gz .
+
+      - name: Upload Linux Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-package
+          path: dist/smart-reply-linux-x64.tar.gz
+          if-no-files-found: error
+
+  # ==============================================================
+  # 4. Flutter Windows Desktop Package
+  # ==============================================================
+  build-windows-flutter:
+    name: Build Windows Flutter App (x64)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        working-directory: smart_reply_app
+        run: flutter pub get
+
+      - name: Build Windows Desktop
+        working-directory: smart_reply_app
+        run: flutter build windows --release
+
+      - name: Package Windows Bundle
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist
+          Compress-Archive -Path smart_reply_app\build\windows\x64\runner\Release\* -DestinationPath dist\smart-reply-flutter-windows-x64.zip
+
+      - name: Upload Windows Flutter Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-flutter-package
+          path: dist/smart-reply-flutter-windows-x64.zip
+          if-no-files-found: error
+
+  # ==============================================================
+  # 5. Native Win32 C++ Desktop Assistant (< 2MB)
+  # ==============================================================
+  build-native-cpp:
+    name: Build Native Win32 C++ Standalone (x64)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure CMake
+        working-directory: desktop
+        run: cmake -B build -A x64
+
+      - name: Compile Standalone Executable
+        working-directory: desktop
+        run: cmake --build build --config Release
+
+      - name: Package Executable & Documentation
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist
+          $bin = Get-ChildItem -Path "desktop/build" -Filter "SmartReplyAI.exe" -Recurse | Select-Object -First 1
+          if (-not $bin) {
+            Write-Error "Could not locate compiled SmartReplyAI.exe"
+            exit 1
+          }
+          Copy-Item $bin.FullName -Destination "dist\SmartReplyAI-standalone.exe"
+          Compress-Archive -Path $bin.FullName, "desktop\README.md" -DestinationPath "dist\smart-reply-desktop-win32-x64.zip"
+
+      - name: Upload Native C++ Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-cpp-desktop
+          path: |
+            dist/SmartReplyAI-standalone.exe
+            dist/smart-reply-desktop-win32-x64.zip
+          if-no-files-found: error
+
+  # ==============================================================
+  # 6. Flutter macOS App & iOS Package
+  # ==============================================================
+  build-apple:
+    name: Build macOS & iOS Packages
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        working-directory: smart_reply_app
+        run: flutter pub get
+
+      - name: Build macOS Desktop App
+        working-directory: smart_reply_app
+        run: flutter build macos --release
+
+      - name: Package macOS App
+        run: |
+          mkdir -p dist
+          cd smart_reply_app/build/macos/Build/Products/Release
+          zip -r ../../../../../dist/smart-reply-macos-universal.zip smart_reply_app.app
+
+      - name: Build iOS App Bundle (Unsigned)
+        working-directory: smart_reply_app
+        run: flutter build ios --release --no-codesign
+
+      - name: Package iOS IPA (Payload Structure for Sideloading)
+        run: |
+          cd smart_reply_app/build/ios/iphoneos
+          mkdir -p Payload
+          cp -r Runner.app Payload/
+          zip -r ../../../../dist/smart-reply-ios-unsigned.ipa Payload
+
+      - name: Upload Apple Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: apple-packages
+          path: |
+            dist/smart-reply-macos-universal.zip
+            dist/smart-reply-ios-unsigned.ipa
+          if-no-files-found: error
+
+  # ==============================================================
+  # 7. Chrome Extension MV3 Package
+  # ==============================================================
+  build-extension:
+    name: Build Chrome Extension (MV3)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Package Extension ZIP
+        run: |
+          mkdir -p dist
+          cd extension
+          zip -r ../dist/smart-reply-chrome-extension.zip manifest.json background.js content.js popup.html popup.js popup.css icons/
+
+      - name: Upload Extension Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrome-extension
+          path: dist/smart-reply-chrome-extension.zip
+          if-no-files-found: error
+
+  # ==============================================================
+  # 8. GitHub Release Publisher & Checksum Generator
+  # ==============================================================
+  publish-release:
+    name: Publish Release Assets
+    needs:
+      - build-android
+      - build-web
+      - build-linux
+      - build-windows-flutter
+      - build-native-cpp
+      - build-apple
+      - build-extension
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Create Release Directory
+        run: mkdir -p release_assets
+
+      - name: Download All Built Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded_artifacts/
+
+      - name: Collect & Flatten Artifacts
+        run: |
+          find downloaded_artifacts/ -type f -exec cp {} release_assets/ \;
+          ls -lah release_assets/
+
+      - name: Generate SHA-256 Checksums
+        working-directory: release_assets
+        run: |
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Determine Release Tag
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
+            echo "draft=${{ github.event.inputs.draft }}" >> $GITHUB_OUTPUT
+            echo "prerelease=${{ github.event.inputs.prerelease }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+            echo "draft=false" >> $GITHUB_OUTPUT
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.vars.outputs.tag }}
+          name: "SmartReply AI Release ${{ steps.vars.outputs.tag }}"
+          draft: ${{ steps.vars.outputs.draft == 'true' }}
+          prerelease: ${{ steps.vars.outputs.prerelease == 'true' }}
+          generate_release_notes: true
+          files: |
+            release_assets/smart-reply-android-release.apk
+            release_assets/smart-reply-web.zip
+            release_assets/smart-reply-linux-x64.tar.gz
+            release_assets/smart-reply-flutter-windows-x64.zip
+            release_assets/SmartReplyAI-standalone.exe
+            release_assets/smart-reply-desktop-win32-x64.zip
+            release_assets/smart-reply-macos-universal.zip
+            release_assets/smart-reply-ios-unsigned.ipa
+            release_assets/smart-reply-chrome-extension.zip
+            release_assets/SHA256SUMS.txt
+          body: |
+            ## 🚀 SmartReply AI Official Multiplatform Release (${{ steps.vars.outputs.tag }})
+
+            Welcome to the official multiplatform release of **SmartReply AI** — the privacy-first, zero-latency hybrid AI productivity suite.
+
+            ### 📦 Download Links by Platform
+
+            | Platform | Download Package | Description |
+            | :--- | :--- | :--- |
+            | **Windows (Native)** | [SmartReplyAI-standalone.exe](https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag }}/SmartReplyAI-standalone.exe) | Standalone $< 2\text{ MB}$ native C++ assistant (`Ctrl+Shift+R`) |
+            | **Windows (Flutter)** | [smart-reply-flutter-windows-x64.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag }}/smart-reply-flutter-windows-x64.zip) | Full Flutter Desktop GUI with rich animations |
+            | **Android** | [smart-reply-android-release.apk](https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag }}/smart-reply-android-release.apk) | Standalone APK ready for phone & tablet installation |
+            | **Chrome / Edge / Brave** | [smart-reply-chrome-extension.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag }}/smart-reply-chrome-extension.zip) | Manifest V3 Browser Extension with selection overlay |
+            | **macOS** | [smart-reply-macos-universal.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag }}/smart-reply-macos-universal.zip) | Universal macOS application bundle |
+            | **Linux** | [smart-reply-linux-x64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag }}/smart-reply-linux-x64.tar.gz) | Standalone Linux x64 GTK desktop bundle |
+            | **iOS** | [smart-reply-ios-unsigned.ipa](https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag }}/smart-reply-ios-unsigned.ipa) | Unsigned IPA archive for AltStore / Sideloading |
+            | **Web** | [smart-reply-web.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag }}/smart-reply-web.zip) | Static web distribution bundle |
+
+            ### 🔒 Checksum Verification
+            Every build is signed with SHA-256 checksums in `SHA256SUMS.txt`.
+            Verify your download:
+            ```bash
+            sha256sum -c SHA256SUMS.txt
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

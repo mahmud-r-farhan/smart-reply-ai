@@ -12,6 +12,7 @@
 
 ## Table of Contents
 
+- [📥 Download Pre-Built Releases](#-download-pre-built-releases)
 - [Overview](#overview)
 - [Four Core Productivity Modes](#four-core-productivity-modes)
 - [Unified Multi-Engine Architecture](#unified-multi-engine-architecture)
@@ -27,6 +28,59 @@
 - [Caching & Zero-Latency Performance](#caching--zero-latency-performance)
 - [Contributing](#contributing)
 - [License](#license)
+
+---
+
+## 📥 Download Pre-Built Releases
+
+You do not need to install Flutter, Node.js, or C++ compilers to use Smart Reply AI. Pre-compiled binaries and installable packages are built automatically and published on every release:
+
+👉 **[Download Latest Release from GitHub Releases](https://github.com/mahmud-r-farhan/smart-reply-ai/releases/latest)**
+
+| Platform | Download File | Size / Requirements | How to Run |
+| :--- | :--- | :--- | :--- |
+| **Windows (Native Assistant)** | `SmartReplyAI-standalone.exe` | $< 2\text{ MB}$, Windows 10/11 | Double-click to run. Press `Ctrl + Shift + R` anywhere! |
+| **Windows (Flutter GUI)** | `smart-reply-flutter-windows-x64.zip` | $\approx 25\text{ MB}$, Windows 10/11 | Extract zip and run `smart_reply_app.exe`. |
+| **Android (Phone & Tablet)** | `smart-reply-android-release.apk` | $\approx 28\text{ MB}$, Android 6.0+ | Download on device and tap to install. |
+| **Chrome / Edge / Brave** | `smart-reply-chrome-extension.zip` | $< 1\text{ MB}$, Chromium browsers | Extract zip, open `chrome://extensions/`, enable Developer Mode, and click **Load unpacked**. |
+| **macOS (Universal)** | `smart-reply-macos-universal.zip` | $\approx 35\text{ MB}$, macOS 11+ | Extract and drag `smart_reply_app.app` to Applications. |
+| **Linux (x64)** | `smart-reply-linux-x64.tar.gz` | $\approx 20\text{ MB}$, glibc 2.31+ | Extract `tar -xvf smart-reply-linux-x64.tar.gz` and run `./smart_reply_app`. |
+| **iOS (Sideload)** | `smart-reply-ios-unsigned.ipa` | $\approx 30\text{ MB}$, iOS 14+ | Sideload via AltStore, SideStore, or TrollStore. |
+| **Web Client** | `smart-reply-web.zip` | $\approx 15\text{ MB}$, Static Host | Deploy to Netlify, Vercel, or any static HTTP server. |
+
+### 🚀 Quick Start Guides for Non-Developers
+
+<details>
+<summary><b>🪟 How to use the Native Windows Assistant (Zero-install setup)</b></summary>
+
+1. Download **`SmartReplyAI-standalone.exe`** from [GitHub Releases](https://github.com/mahmud-r-farhan/smart-reply-ai/releases/latest).
+2. Double-click to launch. An icon will appear in your Windows System Tray (near the clock).
+3. Open any app on your PC (Slack, Outlook, Discord, Word, Chrome, WhatsApp).
+4. Highlight any message or press **`Ctrl + Shift + R`**.
+5. A dark-mode suggestion pill appears floating right next to your cursor.
+6. Click any suggestion: it instantly pastes into your active conversation via native `SendInput`!
+</details>
+
+<details>
+<summary><b>🧩 How to install the Chrome / Edge Browser Extension</b></summary>
+
+1. Download **`smart-reply-chrome-extension.zip`** from [GitHub Releases](https://github.com/mahmud-r-farhan/smart-reply-ai/releases/latest).
+2. Extract the ZIP file into a folder on your computer.
+3. Open Google Chrome, Microsoft Edge, or Brave and navigate to `chrome://extensions/` (or `edge://extensions/`).
+4. Toggle on **Developer mode** in the top-right corner.
+5. Click the **Load unpacked** button in the top-left corner.
+6. Select the extracted folder containing `manifest.json`.
+7. Pin the extension to your browser toolbar for instant smart replies in any webpage!
+</details>
+
+<details>
+<summary><b>📱 How to install the Android APK</b></summary>
+
+1. Download **`smart-reply-android-release.apk`** from [GitHub Releases](https://github.com/mahmud-r-farhan/smart-reply-ai/releases/latest) on your Android phone or tablet.
+2. Tap the downloaded file in your Notification Center or Downloads folder.
+3. If prompted, allow "Install unknown apps" for your browser or file manager.
+4. Tap **Install** and launch Smart Reply AI!
+</details>
 
 ---
 
@@ -95,7 +149,7 @@ Smart Reply AI solves the "Native vs Cloud" dilemma through a **Unified Multi-En
 
 ## Key Features
 
-- **Native Desktop Support (C++ & Rust):** Standalone $< 2\text{ MB}$ native Windows C++ app + Tauri v2 Rust desktop shell with global hotkey (`Ctrl + Shift + R`) and direct window injection.
+- **Native Windows Desktop Support (C++):** Standalone $< 2\text{ MB}$ native Windows C++ assistant with global hotkey (`Ctrl + Shift + R`), system tray integration, and direct auto-paste window injection via `SendInput`.
 - **Multi-Cloud Universal Adapter:** Works out of the box with **Groq**, **OpenRouter**, **Ollama (`http://localhost:11434/v1`)**, **OpenAI**, and custom endpoints.
 - **Privacy-First (BYOK):** API keys are stored locally on user devices (via encrypted storage / `localStorage`). Never transmitted to intermediate proxy servers.
 - **Zero-Latency Offline Fallback:** If internet is cut or no API key is provided, the deterministic heuristics engine guarantees instant responses.
