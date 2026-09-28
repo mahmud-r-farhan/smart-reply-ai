@@ -391,7 +391,19 @@ class HeuristicEngine {
   static List<ReplySuggestion> translateText(String text, String targetLang, String tone) {
     final stopwatch = Stopwatch()..start();
     final clean = text.trim();
-    final lowerLang = targetLang.toLowerCase();
+    var lowerLang = targetLang.toLowerCase();
+
+    // Map common ISO language codes to dictionary keys
+    const langCodeMap = {
+      'es': 'spanish',
+      'fr': 'french',
+      'de': 'german',
+      'bn': 'bengali',
+    };
+    if (langCodeMap.containsKey(lowerLang)) {
+      lowerLang = langCodeMap[lowerLang]!;
+    }
+
     final dict = _offlineDict[lowerLang];
 
     if (dict != null) {

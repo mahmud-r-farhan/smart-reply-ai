@@ -1,0 +1,148 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  # ==========================================
+  # 1. Backend Microservice Test Suite
+  # ==========================================
+  backend-test:
+    name: Backend CI (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: backend/package.json
+
+      - name: Install Dependencies
+        working-directory: backend
+        run: npm install
+
+      - name: Run Test Suite
+        working-directory: backend
+        run: npm test
+
+  # ==========================================
+  # 2. Frontend React Web App Build & Lint
+  # ==========================================
+  frontend-build:
+    name: Frontend React Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+          cache-dependency-path: frontend/package.json
+
+      - name: Install Dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Build Production Assets
+        working-directory: frontend
+        run: npm run build
+
+  # ==========================================
+  # 3. Flutter Multiplatform Analysis & Tests
+  # ==========================================
+  flutter-ci:
+    name: Flutter Analyze, Test & Web Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        working-directory: smart_reply_app
+        run: flutter pub get
+
+      - name: Analyze Static Analysis
+        working-directory: smart_reply_app
+        run: flutter analyze --fatal-infos
+
+      - name: Run Unit & Widget Tests
+        working-directory: smart_reply_app
+        run: flutter test
+
+      - name: Verify Web Build
+        working-directory: smart_reply_app
+        run: flutter build web --no-tree-shake-icons
+
+  # ==========================================
+  # 4. Native Win32 C++ Desktop Build
+  # ==========================================
+  desktop-cpp-build:
+    name: Native Win32 C++ Desktop Build
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure CMake
+        working-directory: desktop/cpp
+        run: cmake -B build -A x64
+
+      - name: Build Executable (Release)
+        working-directory: desktop/cpp
+        run: cmake --build build --config Release
+
+      - name: Verify Output Binary
+        shell: pwsh
+        run: |
+          $bin = "desktop/cpp/build/Release/smart_reply_cpp.exe"
+          if (Test-Path $bin) {
+            Write-Host "C++ binary compiled successfully: $bin"
+            $size = (Get-Item $bin).Length
+            Write-Host "Binary size: $size bytes"
+          } else {
+            Write-Error "Binary was not produced at expected path: $bin"
+            exit 1
+          }
+
+  # ==========================================
+  # 5. Rust / Tauri Desktop Check
+  # ==========================================
+  desktop-rust-check:
+    name: Rust Desktop Check
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Check Cargo Compilation
+        working-directory: desktop/rust
+        run: cargo check --verbose
