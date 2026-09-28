@@ -1,27 +1,68 @@
+export const PROVIDER_PRESETS = {
+  openrouter: {
+    id: "openrouter",
+    name: "OpenRouter (Multi-model Cloud)",
+    baseURL: "https://openrouter.ai/api/v1",
+    defaultModel: "meta-llama/llama-3.3-70b-instruct:free",
+    fallbackModel: "google/gemini-2.0-flash-exp:free"
+  },
+  groq: {
+    id: "groq",
+    name: "Groq (Ultra-Low Latency LPU)",
+    baseURL: "https://api.groq.com/openai/v1",
+    defaultModel: "llama-3.1-8b-instant",
+    fallbackModel: "mixtral-8x7b-32768"
+  },
+  ollama: {
+    id: "ollama",
+    name: "Ollama (Local On-Device Server)",
+    baseURL: "http://localhost:11434/v1",
+    defaultModel: "llama3.2:latest",
+    fallbackModel: "qwen2.5:latest"
+  },
+  openai: {
+    id: "openai",
+    name: "OpenAI Direct",
+    baseURL: "https://api.openai.com/v1",
+    defaultModel: "gpt-4o-mini",
+    fallbackModel: "gpt-3.5-turbo"
+  }
+};
+
 export const MODELS = {
   SUGGESTIONS: {
     models: [
-      "xiaomi/mimo-v2-flash:free",
-      "tngtech/deepseek-r1t2-chimera:free",
-      "openai/gpt-oss-20b:free"
+      "meta-llama/llama-3.3-70b-instruct:free",
+      "google/gemini-2.0-flash-exp:free",
+      "meta-llama/llama-3.1-8b-instruct:free",
+      "qwen/qwen-2.5-7b-instruct:free"
     ],
-    default: "xiaomi/mimo-v2-flash:free"
+    default: "meta-llama/llama-3.3-70b-instruct:free"
   },
   ENHANCEMENTS: {
     models: [
-      "xiaomi/mimo-v2-flash:free",
-      "tngtech/deepseek-r1t2-chimera:free",
-      "openai/gpt-oss-20b:free"
+      "meta-llama/llama-3.3-70b-instruct:free",
+      "google/gemini-2.0-flash-exp:free",
+      "deepseek/deepseek-chat",
+      "qwen/qwen-2.5-7b-instruct:free"
     ],
-    default: "tngtech/deepseek-r1t2-chimera:free"
+    default: "meta-llama/llama-3.3-70b-instruct:free"
   },
   TRANSLATIONS: {
     models: [
-      "openai/gpt-oss-20b:free",
-      "xiaomi/mimo-v2-flash:free",
-      "tngtech/deepseek-r1t2-chimera:free"
+      "google/gemini-2.0-flash-exp:free",
+      "meta-llama/llama-3.3-70b-instruct:free",
+      "qwen/qwen-2.5-7b-instruct:free"
     ],
-    default: "openai/gpt-oss-20b:free"
+    default: "google/gemini-2.0-flash-exp:free"
+  },
+  SUMMARIZATION: {
+    models: [
+      "meta-llama/llama-3.3-70b-instruct:free",
+      "google/gemini-2.0-flash-exp:free",
+      "qwen/qwen-2.5-7b-instruct:free"
+    ],
+    default: "meta-llama/llama-3.3-70b-instruct:free"
   }
 };
 
@@ -32,33 +73,28 @@ export const FORMATS = {
   FRIENDLY: "friendly",
   FORMAL: "formal",
   FLATING: "flating",
-  ROMANTIC: "romantic"
+  ROMANTIC: "romantic",
+  CONCISE: "concise"
 };
 
 export const VALID_FORMATS = Object.values(FORMATS);
 
 /* Get a model for the specified operation type */
 export const getModel = (operationType, index = 0) => {
-  const operation = MODELS[operationType];
-  if (!operation) {
-    throw new Error(`Unknown operation type: ${operationType}`);
-  }
-  
+  const operation = MODELS[operationType] || MODELS.SUGGESTIONS;
   const selectedIndex = index % operation.models.length;
   return operation.models[selectedIndex];
 };
 
 /* Get default model for the specified operation type */
 export const getDefaultModel = (operationType) => {
-  const operation = MODELS[operationType];
-  if (!operation) {
-    throw new Error(`Unknown operation type: ${operationType}`);
-  }
+  const operation = MODELS[operationType] || MODELS.SUGGESTIONS;
   return operation.default;
 };
 
 /* Validate if format is supported */
 export const isValidFormat = (format) => {
+  if (!format) return true;
   return VALID_FORMATS.includes(format.toLowerCase());
 };
 
@@ -68,17 +104,17 @@ export const getAvailableFormats = () => {
 };
 
 // Get format instruction for the LLM
-
 export const getFormatInstruction = (format) => {
-  const lowerFormat = format.toLowerCase();
+  const lowerFormat = (format || "professional").toLowerCase();
   
   const instructions = {
     professional: "in a professional, business-appropriate tone",
     casual: "in a casual, conversational tone",
-    friendly: "in a warm, approachable, and genuinely friendly tone. Be encouraging and personable, using inclusive and positive language that makes the recipient feel valued, comfortable, and at ease.",
+    friendly: "in a warm, approachable, and genuinely friendly tone. Be encouraging and personable, using inclusive and positive language.",
     formal: "in a formal, respectful tone suitable for official correspondence",
-    flating: "as a playful, flirtatious compliment that shows romantic interest while staying tasteful and respectful — charming but never inappropriate",
-    romantic: "as a heartfelt romantic expression conveying genuine affection and emotional depth — intimate and sincere, not generic or clichéd"
+    flating: "as a playful, flirtatious compliment that shows romantic interest while staying tasteful and respectful",
+    romantic: "as a heartfelt romantic expression conveying genuine affection and emotional depth",
+    concise: "in an extremely clear, concise, and to-the-point manner without unnecessary filler"
   };
   
   return instructions[lowerFormat] || instructions.professional;

@@ -2,7 +2,7 @@ import { generateTranslations, FORMATS, isValidFormat } from "../services/openRo
 
 export const translateText = async (req, res, next) => {
   try {
-    const { text, language = "english", format = FORMATS.PROFESSIONAL } = req.body;
+    const { text, language = "english", format = FORMATS.PROFESSIONAL, providerConfig } = req.body;
 
     // Validation
     if (!text || text.trim().length === 0) {
@@ -23,7 +23,7 @@ export const translateText = async (req, res, next) => {
       });
     }
 
-    const translations = await generateTranslations(text.trim(), language, format);
+    const translations = await generateTranslations(text.trim(), language, format, providerConfig);
     res.json({ translations });
   } catch (error) {
     next(error);

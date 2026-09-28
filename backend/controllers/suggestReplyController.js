@@ -2,7 +2,7 @@ import { generateSuggestions, FORMATS, isValidFormat } from "../services/openRou
 
 export const suggestReply = async (req, res, next) => {
   try {
-    const { message, format = FORMATS.PROFESSIONAL } = req.body;
+    const { message, format = FORMATS.PROFESSIONAL, providerConfig } = req.body;
 
     // Validation
     if (!message || message.trim().length === 0) {
@@ -17,7 +17,7 @@ export const suggestReply = async (req, res, next) => {
       });
     }
 
-    const suggestions = await generateSuggestions(message.trim(), format);
+    const suggestions = await generateSuggestions(message.trim(), format, providerConfig);
     res.json({ suggestions });
   } catch (error) {
     next(error);

@@ -2,7 +2,7 @@ import { generateEnhancements, FORMATS, isValidFormat } from "../services/openRo
 
 export const enhanceText = async (req, res, next) => {
   try {
-    const { text, format = FORMATS.PROFESSIONAL } = req.body;
+    const { text, format = FORMATS.PROFESSIONAL, providerConfig } = req.body;
 
     // Validation
     if (!text || text.trim().length === 0) {
@@ -17,7 +17,7 @@ export const enhanceText = async (req, res, next) => {
       });
     }
 
-    const enhancements = await generateEnhancements(text.trim(), format);
+    const enhancements = await generateEnhancements(text.trim(), format, providerConfig);
     res.json({ enhancements });
   } catch (error) {
     next(error);
