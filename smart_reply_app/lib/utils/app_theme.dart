@@ -8,6 +8,15 @@ class AppTheme {
   static const Color accentPink = Color(0xFFEC4899);
   static const Color accentGreen = Color(0xFF10B981);
   
+  // Convenient design system aliases
+  static const Color primary = primaryBlue;
+  static const Color primaryLight = Color(0xFF60A5FA);
+  static const Color secondary = primaryPurple;
+  static const Color accent = accentPink;
+  static const Color surface = Color(0xFF1E293B);
+  static const Color error = Color(0xFFF87171);
+  static const Color success = accentGreen;
+  
   // Background Colors - Clean modern design
   static const Color backgroundDark = Color(0xFF0F172A);
   static const Color backgroundCard = Color(0xFF1E293B);

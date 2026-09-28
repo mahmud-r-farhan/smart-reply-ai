@@ -1,14 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/provider_config.dart';
 import '../providers/chat_provider.dart';
-import '../widgets/gradient_background.dart';
-import '../widgets/mode_selector.dart';
-import '../widgets/style_selector.dart';
-import '../widgets/input_section.dart';
-import '../widgets/results_section.dart';
-import '../widgets/empty_state.dart';
-import '../widgets/developer_side_panel.dart';
 import '../utils/app_theme.dart';
+import '../utils/constants.dart';
+import '../widgets/common/latency_badge.dart';
+import '../widgets/dialogs/provider_settings_sheet.dart';
+import '../widgets/developer_side_panel.dart';
+import '../widgets/gradient_background.dart';
+import '../widgets/input/modular_text_input.dart';
+import '../widgets/input/sample_prompts_row.dart';
+import '../widgets/results/empty_results_view.dart';
+import '../widgets/results/results_container.dart';
+import '../widgets/selectors/engine_mode_chip_bar.dart';
+import '../widgets/selectors/language_picker.dart';
+import '../widgets/selectors/mode_tab_bar.dart';
+import '../widgets/selectors/style_selector_bar.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,92 +25,129 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  bool _showSidePanel = false;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  void _openProviderSettings(BuildContext context, ChatProvider provider) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => ProviderSettingsSheet(
+        currentConfig: provider.providerConfig,
+        onSave: (ProviderConfig newConfig) {
+          provider.setProviderConfig(newConfig);
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
+      endDrawer: Drawer(
+        backgroundColor: Colors.transparent,
+        child: DeveloperSidePanel(
+          onClose: () => _scaffoldKey.currentState?.closeEndDrawer(),
+        ),
+      ),
       body: GradientBackground(
         child: SafeArea(
           child: Consumer<ChatProvider>(
-            builder: (context, chatProvider, child) {
+            builder: (context, chatProvider, _) {
+              final isTranslate = chatProvider.mode == AppMode.translate;
+
               return Column(
                 children: [
-                  // Modern App Header
-                  _buildModernHeader(),
-                  
-                  // Main Content - Scrollable
+                  // App Bar / Top Navigation
+                  _buildHeader(context, chatProvider),
+
+                  // Engine Mode Selector (Hybrid, Offline, Cloud)
+                  EngineModeChipBar(
+                    activeMode: chatProvider.engineMode,
+                    onModeChanged: chatProvider.setEngineMode,
+                    onSettingsPressed: () => _openProviderSettings(context, chatProvider),
+                  ),
+
+                  // Main Scrollable Area
                   Expanded(
                     child: CustomScrollView(
+                      physics: const BouncingScrollPhysics(),
                       slivers: [
-                        // Mode Selector
+                        // Mode Tabs (Reply, Enhance, Translate, Summarize)
                         SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            child: ModeSelector(
-                              currentMode: chatProvider.mode,
-                              onModeChanged: chatProvider.setMode,
-                            ),
+                          child: ModeTabBar(
+                            currentMode: chatProvider.mode,
+                            onModeChanged: chatProvider.setMode,
                           ),
                         ),
-                        
-                        // Style Selector
+
+                        // Style / Tone Selector (or Language picker if translate)
                         SliverToBoxAdapter(
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: StyleSelector(
+                            padding: const EdgeInsets.only(top: 4, bottom: 8),
+                            child: StyleSelectorBar(
                               currentStyle: chatProvider.style,
                               onStyleChanged: chatProvider.setStyle,
                             ),
                           ),
                         ),
-                        
-                        // Input Section
+
+                        // Language Picker if translate mode
+                        if (isTranslate)
+                          SliverToBoxAdapter(
+                            child: LanguagePicker(
+                              currentLanguage: chatProvider.targetLanguage,
+                              onLanguageChanged: chatProvider.setTargetLanguage,
+                            ),
+                          ),
+
+                        // Sample Prompts Quick Row
                         SliverToBoxAdapter(
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: InputSection(
-                              input: chatProvider.input,
+                            padding: const EdgeInsets.only(top: 4, bottom: 10),
+                            child: SamplePromptsRow(
                               mode: chatProvider.mode,
-                              loading: chatProvider.loading,
-                              error: chatProvider.error,
-                              onInputChanged: chatProvider.setInput,
-                              onSubmit: chatProvider.getResults,
-                              onClear: chatProvider.clear,
+                              onSelectPrompt: (prompt) {
+                                chatProvider.setInput(prompt);
+                              },
                             ),
                           ),
                         ),
-                        
-                        const SliverToBoxAdapter(child: SizedBox(height: 16)),
-                        
-                        // Results Section
+
+                        // Modular Text Input Section
                         SliverToBoxAdapter(
-                          child: chatProvider.results.isNotEmpty
-                              ? Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                                  child: ResultsSection(
-                                    results: chatProvider.results,
-                                    mode: chatProvider.mode,
-                                    loading: chatProvider.loading,
-                                    onRegenerate: chatProvider.regenerate,
-                                  ),
-                                )
-                              : const SizedBox.shrink(),
+                          child: ModularTextInput(
+                            input: chatProvider.input,
+                            mode: chatProvider.mode,
+                            loading: chatProvider.loading,
+                            error: chatProvider.error,
+                            onInputChanged: chatProvider.setInput,
+                            onSubmit: chatProvider.getResults,
+                            onClear: chatProvider.clear,
+                          ),
                         ),
-                        
-                        // Empty State or Spacing
-                        SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: chatProvider.results.isEmpty && !chatProvider.loading
-                              ? EmptyState(
-                                  loading: chatProvider.loading,
-                                  results: chatProvider.results,
-                                  input: chatProvider.input,
-                                )
-                              : const SizedBox.shrink(),
+
+                        const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+                        // Results List
+                        SliverToBoxAdapter(
+                          child: ResultsContainer(
+                            results: chatProvider.results,
+                            mode: chatProvider.mode,
+                            loading: chatProvider.loading,
+                            onRegenerate: chatProvider.regenerate,
+                          ),
                         ),
+
+                        // Empty State if no results
+                        if (chatProvider.results.isEmpty && !chatProvider.loading)
+                          SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: EmptyResultsView(mode: chatProvider.mode),
+                          ),
+
+                        const SliverToBoxAdapter(child: SizedBox(height: 24)),
                       ],
                     ),
                   ),
@@ -113,78 +157,78 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      // Side Panel
-      endDrawer: Drawer(
-        backgroundColor: Colors.transparent,
-        child: DeveloperSidePanel(
-          onClose: () {
-            Navigator.of(context).pop();
-          },
-        ),
-      ),
     );
   }
 
-  Widget _buildModernHeader() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: BoxDecoration(
-        color: AppTheme.backgroundCard.withValues(alpha: 0.5),
-        border: Border(
-          bottom: BorderSide(
-            color: AppTheme.borderColor.withValues(alpha: 0.3),
-          ),
-        ),
-      ),
+  Widget _buildHeader(BuildContext context, ChatProvider provider) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
       child: Row(
         children: [
-          // Logo with gradient - Tappable
-          GestureDetector(
-            onTap: () {
-              _scaffoldKey.currentState?.openEndDrawer();
-            },
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: AppTheme.softShadow,
+          // Logo & Title
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              child: Image.network(
-                'https://i.postimg.cc/HkhmHFxy/icons8-chatbot-48.png',
-                width: 26,
-                height: 26,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Icon(
-                    Icons.wifi_off,
-                    size: 26,
-                    color: Colors.white,
-                  );
-                },
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Title and subtitle
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Smart Reply',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                      ),
-                ),
-                Text(
-                  'AI-powered messaging',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textMuted,
-                      ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF6366F1).withValues(alpha: 0.35),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
+            child: const Icon(
+              Icons.auto_awesome_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Smart Reply AI',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.textPrimary,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              Text(
+                'High-performance on-device & cloud assistant',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppTheme.textMuted.withValues(alpha: 0.7),
+                ),
+              ),
+            ],
+          ),
+
+          const Spacer(),
+
+          // If there was a previous run latency, show badge
+          if (provider.lastLatencyMs > 0)
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: LatencyBadge(
+                latencyMs: provider.lastLatencyMs,
+                source: provider.results.firstOrNull?.source ?? 'heuristic',
+              ),
+            ),
+
+          // Menu button (Side panel)
+          IconButton(
+            icon: const Icon(Icons.info_outline_rounded, color: AppTheme.textSecondary, size: 22),
+            tooltip: 'About & Open Source Info',
+            onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
           ),
         ],
       ),
