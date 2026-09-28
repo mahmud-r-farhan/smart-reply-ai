@@ -110,9 +110,11 @@ Smart Reply AI solves the "Native vs Cloud" dilemma through a **Unified Multi-En
 
 ```
 smart-reply/
-├── desktop/              # Native Desktop Applications
-│   ├── cpp/              # Pure Native C++ Win32 App (<2MB footprint, SendInput injection, tray)
-│   └── rust/             # Tauri v2 + Rust Desktop App (Global shortcut, Reqwest LLM)
+├── desktop/              # Native Win32 C++ Desktop App (<2MB standalone, SendInput injection, tray)
+│   ├── CMakeLists.txt    # Modern CMake build configuration
+│   ├── build.bat         # One-click Windows build script
+│   ├── include/          # Modular headers (clipboard, cloud, floating window, tray)
+│   └── src/              # Win32 GDI+ UI, WinINet cloud client, heuristic engine
 ├── backend/
 │   ├── controllers/      # suggestReply, enhanceText, translateText, summarizeText
 │   ├── services/         # universalLlmService (OpenAI protocol), heuristicEngine
@@ -200,29 +202,18 @@ flutter analyze
 
 ---
 
-### Native Desktop Apps Setup (C++ & Rust)
+### Native Windows Desktop Setup (`desktop/`)
 
-Smart Reply AI provides two native desktop solutions in `desktop/`:
-
-#### Option 1: Native Windows C++ Standalone App (`desktop/cpp/`)
+Smart Reply AI provides a standalone native Windows C++ assistant in `desktop/`:
 * **Binary footprint:** $< 2\text{ MB}$, $< 15\text{ MB}$ RAM idle, zero runtime dependencies.
 * **Global Hotkey:** `Ctrl + Shift + R` invokes a floating suggestion overlay in any Windows app.
 * **Direct Auto-Paste:** Clicking a suggestion automatically injects the text into your active target window via `SendInput`.
 * **To Build:**
   ```cmd
-  cd desktop/cpp
+  cd desktop
   build.bat
   ```
   *(Or run `cmake -B build && cmake --build build --config Release`)*
-
-#### Option 2: Tauri v2 + Rust Desktop App (`desktop/rust/`)
-* **Modern Shell:** Tauri v2 with shared React UI and Rust backend orchestrator.
-* **To Run & Build:**
-  ```bash
-  cd desktop/rust
-  cargo tauri dev      # Run in development
-  cargo tauri build    # Produce Windows installer (.msi / .exe)
-  ```
 
 ---
 

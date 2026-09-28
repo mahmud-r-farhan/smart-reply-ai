@@ -18,8 +18,7 @@ Fixes #(issue)
   - [ ] Android / iOS
   - [ ] Desktop (Windows / macOS / Linux)
   - [ ] Web
-- [ ] Native C++ Desktop (`desktop/cpp/`)
-- [ ] Rust / Tauri Desktop (`desktop/rust/`)
+- [ ] Native C++ Desktop (`desktop/`)
 - [ ] React Frontend (`frontend/`)
 - [ ] Chrome Extension MV3 (`extension/`)
 - [ ] Node.js Backend (`backend/`)

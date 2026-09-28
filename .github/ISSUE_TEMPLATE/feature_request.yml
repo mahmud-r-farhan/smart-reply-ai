@@ -32,7 +32,6 @@ body:
         - All Clients (Cross-Platform)
         - Flutter App
         - Native C++ Desktop
-        - Rust / Tauri Desktop
         - Chrome Extension
         - Web App
         - Backend Service

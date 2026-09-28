@@ -20,7 +20,6 @@ graph TD
     subgraph Clients ["Client Layer"]
         FL["Flutter Client (Multiplatform)<br/>Android · iOS · Win · Mac · Linux · Web"]
         CPP["Native C++ Win32 Assistant<br/>(< 2 MB Standalone · Ctrl+Shift+R)"]
-        RUST["Rust / Tauri Runner<br/>(Cross-Platform Desktop)"]
         REACT["React SPA<br/>(Vite Web App)"]
         EXT["Chrome Extension MV3<br/>(Selection Toolbar & Sidecar)"]
     end
@@ -45,7 +44,6 @@ graph TD
 
     FL --> DISPATCHER
     CPP --> DISPATCHER
-    RUST --> DISPATCHER
     REACT --> DISPATCHER
     EXT --> DISPATCHER
 
@@ -133,7 +131,7 @@ sequenceDiagram
   - `StyleSelectorBar` & `LanguagePicker`: Contextual configuration controls.
   - `ProviderSettingsSheet`: Modal for custom Base URL, API Key, Model ID, and temperature.
 
-### B. Native Win32 C++ Desktop (`desktop/cpp/`)
+### B. Native Win32 C++ Desktop (`desktop/`)
 - **Technology**: Pure C++17 with Win32 API, GDI+, and WinINet.
 - **Footprint**: Compiled binary is < 2 MB, requires no Electron or WebView2 runtime.
 - **Workflow**:

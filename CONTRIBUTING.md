@@ -18,8 +18,7 @@ Following these guidelines helps maintain clean code, consistent styles, high pe
   - [React Web Application](#2-react-web-application-frontend)
   - [Chrome Extension (MV3)](#3-chrome-extension-mv3-extension)
   - [Node.js Backend & API](#4-nodejs-backend-backend)
-  - [Native Win32 C++ Desktop](#5-native-win32-c-desktop-desktopcpp)
-  - [Rust / Tauri Desktop](#6-rust--tauri-desktop-desktoprust)
+  - [Native Win32 C++ Desktop](#5-native-win32-c-desktop-desktop)
 - [Coding & Design Standards](#coding--design-standards)
 - [Commit Message Conventions](#commit-message-conventions)
 - [Testing & Quality Verification](#testing--quality-verification)
@@ -124,31 +123,19 @@ npm run dev     # Starts nodemon development server on port 3000
 npm test        # Runs test suites
 ```
 
-### 5. Native Win32 C++ Desktop (`desktop/cpp/`)
+### 5. Native Win32 C++ Desktop (`desktop/`)
 Lightweight (< 2 MB) standalone Windows executable with global keyboard hooks (`Ctrl+Shift+R`), GDI+ floating palette, and WinINet HTTP client.
 
 **Prerequisites:** Visual Studio 2022 / MSVC (C++17) or MinGW-w64, CMake >= 3.16.
 
 ```bash
-cd desktop/cpp
+cd desktop
 mkdir build && cd build
 cmake ..
 cmake --build . --config Release
 
 # Or quick build using the batch script on Windows:
-..\build.bat
-```
-
-### 6. Rust / Tauri Desktop (`desktop/rust/`)
-Cross-platform desktop runner built with Rust and Tauri v2.
-
-**Prerequisites:** Rust toolchain (`cargo`, `rustc` >= 1.70.0), Node.js.
-
-```bash
-cd desktop/rust
-cargo check
-cargo test
-cargo build --release
+.\build.bat
 ```
 
 ---

@@ -17,7 +17,6 @@ body:
         - Flutter App (Windows / macOS / Linux Desktop)
         - Flutter App (Web)
         - Native C++ Desktop (Win32)
-        - Rust / Tauri Desktop
         - Chrome Extension MV3
         - React Web Frontend
         - Node.js Backend API

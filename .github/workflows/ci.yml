@@ -109,49 +109,23 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure CMake
-        working-directory: desktop/cpp
+        working-directory: desktop
         run: cmake -B build -A x64
 
       - name: Build Executable (Release)
-        working-directory: desktop/cpp
+        working-directory: desktop
         run: cmake --build build --config Release
 
       - name: Verify Output Binary
         shell: pwsh
         run: |
-          $bin = Get-ChildItem -Path "desktop/cpp/build" -Filter "SmartReplyAI.exe" -Recurse | Select-Object -First 1
+          $bin = Get-ChildItem -Path "desktop/build" -Filter "SmartReplyAI.exe" -Recurse | Select-Object -First 1
           if ($bin -and (Test-Path $bin.FullName)) {
             Write-Host "C++ binary compiled successfully: $($bin.FullName)"
             Write-Host "Binary size: $($bin.Length) bytes"
           } else {
             Write-Host "Listing build directory contents:"
-            Get-ChildItem -Path "desktop/cpp/build" -Recurse | Select-Object FullName
-            Write-Error "Binary SmartReplyAI.exe was not found in desktop/cpp/build"
+            Get-ChildItem -Path "desktop/build" -Recurse | Select-Object FullName
+            Write-Error "Binary SmartReplyAI.exe was not found in desktop/build"
             exit 1
           }
-
-  # ==========================================
-  # 5. Rust / Tauri Desktop Check
-  # ==========================================
-  desktop-rust-check:
-    name: Rust Desktop Check
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Prepare Frontend Dist Stub
-        shell: pwsh
-        run: |
-          if (!(Test-Path "frontend/dist")) {
-            New-Item -ItemType Directory -Force "frontend/dist"
-            Set-Content "frontend/dist/index.html" "<!DOCTYPE html><html><head><title>SmartReply AI</title></head><body><div id='root'></div></body></html>"
-          }
-
-      - name: Check Cargo Compilation
-        working-directory: desktop/rust
-        run: cargo check --verbose

@@ -49,8 +49,7 @@ All clients (Flutter, React, Extension, Win32 C++, Rust) communicate with cloud 
 The offline heuristic engine guarantees zero latency (< 5ms) and works even without internet connectivity or API keys. It is implemented consistently across platforms:
 - **Dart**: [smart_reply_app/lib/services/heuristic_engine.dart](smart_reply_app/lib/services/heuristic_engine.dart)
 - **JavaScript (Web & Extension)**: [frontend/src/utils/heuristicEngine.js](frontend/src/utils/heuristicEngine.js) & [backend/services/heuristicEngine.js](backend/services/heuristicEngine.js)
-- **C++**: [desktop/cpp/src/heuristics.cpp](desktop/cpp/src/heuristics.cpp)
-- **Rust**: [desktop/rust/src/heuristics.rs](desktop/rust/src/heuristics.rs)
+- **C++**: [desktop/src/heuristic_engine.cpp](desktop/src/heuristic_engine.cpp)
 
 ### Rules for Adding New Heuristic Patterns
 When adding new response triggers or grammar rules:
@@ -84,11 +83,11 @@ flutter test
 ### Win32 C++ Native Floating App
 - Build in Debug configuration:
   ```bash
-  cd desktop/cpp
+  cd desktop
   cmake -B build -DCMAKE_BUILD_TYPE=Debug
   cmake --build build
   ```
-- Use Visual Studio or WinDbg to attach to `smart_reply_cpp.exe` and test the low-level keyboard hook callback `LowLevelKeyboardProc`.
+- Use Visual Studio or WinDbg to attach to `SmartReplyAI.exe` and test the low-level keyboard hook callback `LowLevelKeyboardProc`.
 
 ---
 
