@@ -1,0 +1,72 @@
+name: Bug Report
+description: Create a report to help us fix a bug or unexpected behavior in SmartReply AI
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report an issue! Please provide as much detail as possible.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      description: Which part of SmartReply AI has the bug?
+      options:
+        - Flutter App (Android / iOS)
+        - Flutter App (Windows / macOS / Linux Desktop)
+        - Flutter App (Web)
+        - Native C++ Desktop (Win32)
+        - Rust / Tauri Desktop
+        - Chrome Extension MV3
+        - React Web Frontend
+        - Node.js Backend API
+        - Heuristic / Offline Engine
+      default: 0
+    validations:
+      required: true
+  - type: dropdown
+    id: engine_mode
+    attributes:
+      label: Engine Mode
+      description: Which engine mode were you running?
+      options:
+        - Auto (Cloud with Offline Fallback)
+        - Offline Heuristic (< 5ms)
+        - Cloud LLM (Groq / OpenRouter / OpenAI / Ollama)
+      default: 0
+    validations:
+      required: true
+  - type: input
+    id: os_version
+    attributes:
+      label: Operating System & Version
+      placeholder: e.g. Windows 11 23H2 / macOS Sonoma 14.5 / Ubuntu 24.04 / Android 14
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the Bug
+      description: A clear and concise description of what the bug is.
+      placeholder: What happened versus what you expected to happen...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction_steps
+    attributes:
+      label: Steps to Reproduce
+      description: Exact steps to reproduce the issue.
+      placeholder: |
+        1. Open Flutter app on Windows
+        2. Set mode to Smart Enhance
+        3. Enter input '...'
+        4. See error...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Logs or Stack Trace
+      description: Paste any error messages, terminal logs, or browser console outputs.
+      render: shell
