@@ -64,6 +64,30 @@ jobs:
         run: npm run build
 
   # ==========================================
+  # 2b. Demo Showcase Web App Build
+  # ==========================================
+  demo-build:
+    name: Demo Showcase Web App Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - name: Install Dependencies
+        working-directory: demo
+        run: npm install
+
+      - name: Build Demo Web Application
+        working-directory: demo
+        run: npm run build
+
+  # ==========================================
   # 3. Flutter Multiplatform Analysis & Tests
   # ==========================================
   flutter-ci:

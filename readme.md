@@ -215,11 +215,15 @@ smart-reply/
 │   ├── lib/providers/    # chat_provider (ChangeNotifier)
 │   ├── lib/widgets/      # modular components: common, selectors, input, results, dialogs
 │   └── lib/screens/      # home_screen (clean composed architecture)
-└── harmonyos/            # Pure Native HarmonyOS Application (Stage Model, ArkTS, ArkUI)
-    ├── build-profile.json5 # Project build settings (API 12, Stage model)
-    ├── hvigorfile.ts     # Hvigor build automation entrypoint
-    ├── AppScope/         # Global bundle metadata & strings
-    └── entry/            # Primary feature module (UIAbility, Pages, ArkTS services)
+├── harmonyos/            # Pure Native HarmonyOS Application (Stage Model, ArkTS, ArkUI)
+│   ├── build-profile.json5 # Project build settings (API 12, Stage model)
+│   ├── hvigorfile.ts     # Hvigor build automation entrypoint
+│   ├── AppScope/         # Global bundle metadata & strings
+│   └── entry/            # Primary feature module (UIAbility, Pages, ArkTS services)
+└── demo/                 # Interactive Multiplatform Showcase Web App (Vite + React)
+    ├── src/components/   # DeviceSimulator, BenchmarkSection, ScalingVisualizer, DeploymentGuide
+    ├── server.js         # Production static server for Render web service deployment
+    └── package.json      # Scripts for local dev (npm run dev) & build (npm run build)
 ```
 
 ---
@@ -367,9 +371,3 @@ Contributions from the open-source community are welcome!
 3. Commit your Changes (`git commit -m 'feat: add AmazingFeature'`)
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
-
----
-
-## License
-
-Distributed under the MIT License. See [LICENSE](LICENSE) for more details.
