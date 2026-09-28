@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/provider_config.dart';
@@ -6,6 +7,8 @@ import '../utils/app_theme.dart';
 import '../utils/constants.dart';
 import '../widgets/common/latency_badge.dart';
 import '../widgets/dialogs/provider_settings_sheet.dart';
+import '../widgets/dialogs/smartwatch_modal.dart';
+import '../services/watch_bridge_service.dart';
 import '../widgets/developer_side_panel.dart';
 import '../widgets/gradient_background.dart';
 import '../widgets/input/modular_text_input.dart';
@@ -26,6 +29,51 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  StreamSubscription<WatchReplyEvent>? _watchReplySub;
+
+  @override
+  void initState() {
+    super.initState();
+    WatchBridgeService.initialize();
+    _watchReplySub = WatchBridgeService.replyStream.listen((event) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.watch_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '⌚ Reply sent from watch to ${event.sender}: "${event.reply}"',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF6366F1),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _watchReplySub?.cancel();
+    super.dispose();
+  }
+
+  void _openSmartwatchModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => const SmartwatchModal(),
+    );
+  }
 
   void _openProviderSettings(BuildContext context, ChatProvider provider) {
     showModalBottomSheet(
@@ -223,6 +271,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 source: provider.results.firstOrNull?.source ?? 'heuristic',
               ),
             ),
+
+          // Smartwatch Sync & Wear OS Modal
+          IconButton(
+            icon: const Icon(Icons.watch_rounded, color: AppTheme.textSecondary, size: 22),
+            tooltip: 'Wear OS & Smartwatch Sync',
+            onPressed: () => _openSmartwatchModal(context),
+          ),
 
           // Menu button (Side panel)
           IconButton(

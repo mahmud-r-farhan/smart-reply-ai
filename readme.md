@@ -17,6 +17,7 @@
 - [Four Core Productivity Modes](#four-core-productivity-modes)
 - [Unified Multi-Engine Architecture](#unified-multi-engine-architecture)
 - [Key Features](#key-features)
+- [Smartwatch & Wear OS Integration](#smartwatch--wear-os-integration)
 - [Tech Stack & Modular Architecture](#tech-stack--modular-architecture)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
@@ -156,7 +157,20 @@ Smart Reply AI solves the "Native vs Cloud" dilemma through a **Unified Multi-En
 - **7 Tones & Response Styles:** Professional, Friendly, Casual, Concise, Formal, Flirty, and Romantic.
 - **Multi-Language Translation:** Spanish, French, German, Bengali, Japanese, Chinese, Arabic, Portuguese, Italian, Hindi, and English.
 - **Telemetry & Provenance Badges:** Live badges showing exact latency (`⚡ On-Device 3ms` vs `☁️ Cloud 260ms`) and generating model.
+- **Smartwatch & Wear OS Instant Reply:** Automatic incoming message interception via Android `NotificationListenerService` and dynamic circular reply pills via `NotificationCompat.WearableExtender` with `RemoteInput.setChoices()`. Tap a suggestion on your wrist to auto-reply instantly!
 - **Modular Component Design:** Granular, single-responsibility widgets and components for high maintainability.
+
+---
+
+## ⌚ Smartwatch & Wear OS Integration
+
+Smart Reply AI turns your smartwatch into a zero-latency conversational hub:
+- **Wear OS (Galaxy Watch 4/5/6/7, Pixel Watch 1/2/3, TicWatch):** Smart replies automatically render as interactive, circular suggestion pills right beneath message notifications.
+- **Zero-Lag Processing (< 1ms):** On-device heuristic engine analyzes incoming WhatsApp, Telegram, SMS, and Slack notifications without cloud latency or battery drain.
+- **Direct Auto-Reply via Device:** Tapping any suggestion pill on the watch face instantly fires a `RemoteInput` callback to the phone, dispatching the response seamlessly.
+- **Non-Wear OS & watchOS Compatibility:** Also equips quick action response buttons for Apple Watch, Garmin, Fitbit, and Amazfit.
+
+👉 **Read the complete guide in [SMARTWATCH.md](SMARTWATCH.md)**
 
 ---
 
