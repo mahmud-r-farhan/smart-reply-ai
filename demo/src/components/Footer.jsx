@@ -6,6 +6,7 @@ export default function Footer() {
     <footer className="footer">
       <div className="container">
         <div className="footer-links">
+          <a href="#apple-ecosystem" className="footer-link">iPhone &amp; Watch Sync</a>
           <a href="#devices" className="footer-link">Device Simulator</a>
           <a href="#benchmark" className="footer-link">Offline Benchmark</a>
           <a href="#scaling" className="footer-link">Backend Scaling</a>
@@ -17,7 +18,7 @@ export default function Footer() {
         </div>
 
         <div className="footer-copy">
-          Smart Reply AI Suite • Open-Source under MIT License • Released with v1.1.0 Multiplatform Distribution.
+          Smart Reply AI Suite • Open-Source under MIT License • by Bengal Bytes.
         </div>
       </div>
     </footer>

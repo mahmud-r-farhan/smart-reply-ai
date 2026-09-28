@@ -12,9 +12,10 @@ export default function Navbar() {
         </a>
 
         <ul className="nav-links">
-          <li><a href="#devices" className="nav-link">Devices & Watch</a></li>
+          <li><a href="#apple-ecosystem" className="nav-link">iPhone &amp; Watch</a></li>
+          <li><a href="#devices" className="nav-link">All Devices</a></li>
           <li><a href="#benchmark" className="nav-link">Offline Benchmark</a></li>
-          <li><a href="#scaling" className="nav-link">Scaling & Singleflight</a></li>
+          <li><a href="#scaling" className="nav-link">Scaling &amp; Singleflight</a></li>
           <li><a href="#deployment" className="nav-link">Deploy Backend</a></li>
           <li><a href="#download" className="nav-link">Download</a></li>
         </ul>

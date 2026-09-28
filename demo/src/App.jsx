@@ -1,6 +1,7 @@
 import React from 'react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
+import AppleEcosystemSync from './components/AppleEcosystemSync';
 import DeviceSimulator from './components/DeviceSimulator';
 import BenchmarkSection from './components/BenchmarkSection';
 import ScalingVisualizer from './components/ScalingVisualizer';
@@ -24,7 +25,10 @@ export default function App() {
       {/* Hero Section */}
       <Hero />
 
-      {/* Interactive Device & Smartwatch Simulator */}
+      {/* NEW: Apple iPhone & Apple Watch Dual-Device Ecosystem Sync */}
+      <AppleEcosystemSync />
+
+      {/* Interactive Device & Multi-Platform Simulator */}
       <DeviceSimulator />
 
       {/* Live On-Device Latency Benchmark */}
