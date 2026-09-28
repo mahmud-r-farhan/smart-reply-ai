@@ -62,7 +62,7 @@ Smart Reply AI solves the "Native vs Cloud" dilemma through a **Unified Multi-En
 ```text
                                   +---------------------------------------+
                                   |       Application Presentation        |
-                                  |  (Flutter App / Web / MV3 Extension)  |
+                                  |  (Native C++/Rust, Flutter, Web, Ext) |
                                   +---------------------------------------+
                                                       |
                                                       v
@@ -78,9 +78,10 @@ Smart Reply AI solves the "Native vs Cloud" dilemma through a **Unified Multi-En
                      |    Local On-Device Subsystem     |   |    Universal Cloud Subsystem     |
                      +----------------------------------+   +----------------------------------+
                      | - Zero-latency Rule Heuristics   |   | - Groq LPU (llama-3.1-8b-instant)|
-                     | - Google ML Kit Android SDK      |   | - OpenRouter (Llama 3.3 70B)     |
-                     | - Client-side phrasebook dict    |   | - Ollama (Local on-device LAN)   |
-                     | - Offline execution (<5ms)       |   | - Protocol: OpenAI-compatible API|
+                     | - Native C++ Win32 & Rust Core   |   | - OpenRouter (Llama 3.3 70B)     |
+                     | - Google ML Kit Android SDK      |   | - Ollama (Local on-device LAN)   |
+                     | - Client-side phrasebook dict    |   | - Protocol: OpenAI-compatible API|
+                     | - Offline execution (<5ms)       |   |                                  |
                      +----------------------------------+   +----------------------------------+
 ```
 
@@ -94,6 +95,7 @@ Smart Reply AI solves the "Native vs Cloud" dilemma through a **Unified Multi-En
 
 ## Key Features
 
+- **Native Desktop Support (C++ & Rust):** Standalone $< 2\text{ MB}$ native Windows C++ app + Tauri v2 Rust desktop shell with global hotkey (`Ctrl + Shift + R`) and direct window injection.
 - **Multi-Cloud Universal Adapter:** Works out of the box with **Groq**, **OpenRouter**, **Ollama (`http://localhost:11434/v1`)**, **OpenAI**, and custom endpoints.
 - **Privacy-First (BYOK):** API keys are stored locally on user devices (via encrypted storage / `localStorage`). Never transmitted to intermediate proxy servers.
 - **Zero-Latency Offline Fallback:** If internet is cut or no API key is provided, the deterministic heuristics engine guarantees instant responses.
@@ -108,6 +110,9 @@ Smart Reply AI solves the "Native vs Cloud" dilemma through a **Unified Multi-En
 
 ```
 smart-reply/
+├── desktop/              # Native Desktop Applications
+│   ├── cpp/              # Pure Native C++ Win32 App (<2MB footprint, SendInput injection, tray)
+│   └── rust/             # Tauri v2 + Rust Desktop App (Global shortcut, Reqwest LLM)
 ├── backend/
 │   ├── controllers/      # suggestReply, enhanceText, translateText, summarizeText
 │   ├── services/         # universalLlmService (OpenAI protocol), heuristicEngine
@@ -127,12 +132,7 @@ smart-reply/
     ├── lib/models/       # engine_mode, provider_config, reply_suggestion, chat_message
     ├── lib/services/     # heuristic_engine, cloud_llm_engine, hybrid_dispatcher, settings_storage
     ├── lib/providers/    # chat_provider (ChangeNotifier)
-    ├── lib/widgets/
-    │   ├── common/       # glass_container, latency_badge
-    │   ├── selectors/    # engine_mode_chip_bar, mode_tab_bar, style_selector_bar, language_picker
-    │   ├── input/        # modular_text_input, sample_prompts_row
-    │   ├── results/      # modular_result_card, results_container, empty_results_view
-    │   └── dialogs/      # provider_settings_sheet, developer_side_panel
+    ├── lib/widgets/      # modular components: common, selectors, input, results, dialogs
     └── lib/screens/      # home_screen (clean composed architecture)
 ```
 
@@ -197,6 +197,32 @@ flutter analyze
 2. Enable **Developer mode** (top-right toggle).
 3. Click **Load unpacked** and select the `extension/` directory.
 4. Pin the extension to test instant smart replies, translations, and text insertions.
+
+---
+
+### Native Desktop Apps Setup (C++ & Rust)
+
+Smart Reply AI provides two native desktop solutions in `desktop/`:
+
+#### Option 1: Native Windows C++ Standalone App (`desktop/cpp/`)
+* **Binary footprint:** $< 2\text{ MB}$, $< 15\text{ MB}$ RAM idle, zero runtime dependencies.
+* **Global Hotkey:** `Ctrl + Shift + R` invokes a floating suggestion overlay in any Windows app.
+* **Direct Auto-Paste:** Clicking a suggestion automatically injects the text into your active target window via `SendInput`.
+* **To Build:**
+  ```cmd
+  cd desktop/cpp
+  build.bat
+  ```
+  *(Or run `cmake -B build && cmake --build build --config Release`)*
+
+#### Option 2: Tauri v2 + Rust Desktop App (`desktop/rust/`)
+* **Modern Shell:** Tauri v2 with shared React UI and Rust backend orchestrator.
+* **To Run & Build:**
+  ```bash
+  cd desktop/rust
+  cargo tauri dev      # Run in development
+  cargo tauri build    # Produce Windows installer (.msi / .exe)
+  ```
 
 ---
 
