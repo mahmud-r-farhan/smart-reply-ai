@@ -68,46 +68,44 @@ jobs:
           if-no-files-found: error
 
   # ==============================================================
-  # 1b. Huawei AppGallery & HarmonyOS APK Build
+  # 1b. Native HarmonyOS Application Package
   # ==============================================================
-  build-huawei:
-    name: Build Huawei AppGallery APK
+  build-harmonyos:
+    name: Package Native HarmonyOS App
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          node-version: 20.x
 
-      - name: Setup Flutter SDK
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.x'
-          channel: 'stable'
-          cache: true
+      - name: Verify HarmonyOS ArkTS & Stage Model
+        run: |
+          echo "Verifying HarmonyOS Stage Model structure..."
+          test -f harmonyos/build-profile.json5 || exit 1
+          test -f harmonyos/AppScope/app.json5 || exit 1
+          test -f harmonyos/entry/src/main/module.json5 || exit 1
+          test -f harmonyos/entry/src/main/ets/entryability/EntryAbility.ets || exit 1
+          test -f harmonyos/entry/src/main/ets/pages/Index.ets || exit 1
+          test -f harmonyos/entry/src/main/ets/services/HeuristicEngine.ets || exit 1
+          test -f harmonyos/entry/src/main/ets/services/CloudEngine.ets || exit 1
+          test -f harmonyos/entry/src/main/ets/services/NotificationBridge.ets || exit 1
+          echo "✓ HarmonyOS structure validated."
 
-      - name: Install Dependencies
-        working-directory: smart_reply_app
-        run: flutter pub get
-
-      - name: Build Huawei Release APK
-        working-directory: smart_reply_app
-        run: flutter build apk --release --no-tree-shake-icons
-
-      - name: Package Huawei AppGallery Artifact
+      - name: Package HarmonyOS Native Distribution
         run: |
           mkdir -p dist
-          cp smart_reply_app/build/app/outputs/flutter-apk/app-release.apk dist/smart-reply-huawei-appgallery-release.apk
+          cd harmonyos
+          zip -r ../dist/smart-reply-harmonyos-native.zip . -x ".*" -x "*/.*"
 
-      - name: Upload Huawei Artifact
+      - name: Upload HarmonyOS Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: huawei-appgallery-apk
-          path: dist/smart-reply-huawei-appgallery-release.apk
+          name: harmonyos-app
+          path: dist/smart-reply-harmonyos-native.zip
           if-no-files-found: error
 
   # ==============================================================
@@ -357,7 +355,7 @@ jobs:
     name: Publish Release Assets
     needs:
       - build-android
-      - build-huawei
+      - build-harmonyos
       - build-web
       - build-linux
       - build-windows-flutter
@@ -411,7 +409,7 @@ jobs:
           generate_release_notes: true
           files: |
             release_assets/smart-reply-android-release.apk
-            release_assets/smart-reply-huawei-appgallery-release.apk
+            release_assets/smart-reply-harmonyos-native.zip
             release_assets/smart-reply-web.zip
             release_assets/smart-reply-linux-x64.tar.gz
             release_assets/smart-reply-flutter-windows-x64.zip
@@ -433,7 +431,7 @@ jobs:
             | **Windows (Native)** | [SmartReplyAI-standalone.exe](https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag }}/SmartReplyAI-standalone.exe) | Standalone $< 2\text{ MB}$ native C++ assistant (`Ctrl+Shift+R`) |
             | **Windows (Flutter)** | [smart-reply-flutter-windows-x64.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag }}/smart-reply-flutter-windows-x64.zip) | Full Flutter Desktop GUI with rich animations |
             | **Android (Phone & Tablet)** | [smart-reply-android-release.apk](https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag }}/smart-reply-android-release.apk) | Standalone APK ready for phone & tablet installation |
-            | **Huawei AppGallery (HarmonyOS)** | [smart-reply-huawei-appgallery-release.apk](https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag }}/smart-reply-huawei-appgallery-release.apk) | Optimized for HarmonyOS & EMUI (Huawei Mate, Pura, MatePad) |
+            | **HarmonyOS (Native ArkTS)** | [smart-reply-harmonyos-native.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag }}/smart-reply-harmonyos-native.zip) | Native ArkTS / ArkUI app bundle for DevEco Studio & HarmonyOS |
             | **Chrome / Edge / Brave** | [smart-reply-chrome-extension.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag }}/smart-reply-chrome-extension.zip) | Manifest V3 Browser Extension with selection overlay |
             | **macOS** | [smart-reply-macos-universal.zip](https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag }}/smart-reply-macos-universal.zip) | Universal macOS application bundle |
             | **Linux** | [smart-reply-linux-x64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ steps.vars.outputs.tag }}/smart-reply-linux-x64.tar.gz) | Standalone Linux x64 GTK desktop bundle |

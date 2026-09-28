@@ -4,7 +4,7 @@ import UserNotifications
 import WatchConnectivity
 
 @main
-@objc class AppDelegate: FlutterAppDelegate, UNUserNotificationCenterDelegate, WCSessionDelegate {
+@objc class AppDelegate: FlutterAppDelegate, WCSessionDelegate {
   
   private var methodChannel: FlutterMethodChannel?
   private static let channelName = "com.smartreply.smart_reply_app/watch_bridge"
