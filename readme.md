@@ -42,7 +42,8 @@ You do not need to install Flutter, Node.js, or C++ compilers to use Smart Reply
 | :--- | :--- | :--- | :--- |
 | **Windows (Native Assistant)** | `SmartReplyAI-standalone.exe` | $< 2\text{ MB}$, Windows 10/11 | Double-click to run. Press `Ctrl + Shift + R` anywhere! |
 | **Windows (Flutter GUI)** | `smart-reply-flutter-windows-x64.zip` | $\approx 25\text{ MB}$, Windows 10/11 | Extract zip and run `smart_reply_app.exe`. |
-| **Android (Phone & Tablet)** | `smart-reply-android-release.apk` | $\approx 28\text{ MB}$, Android 6.0+ | Download on device and tap to install. |
+| **Android (Google Play / AOSP)** | `smart-reply-android-release.apk` | $\approx 28\text{ MB}$, Android 6.0+ | Download on device and tap to install. |
+| **Huawei AppGallery (HarmonyOS)** | `smart-reply-huawei-appgallery-release.apk` | $\approx 28\text{ MB}$, HarmonyOS 2-4 / EMUI | Download on Huawei device or deploy to AppGallery Connect. |
 | **Chrome / Edge / Brave** | `smart-reply-chrome-extension.zip` | $< 1\text{ MB}$, Chromium browsers | Extract zip, open `chrome://extensions/`, enable Developer Mode, and click **Load unpacked**. |
 | **macOS (Universal)** | `smart-reply-macos-universal.zip` | $\approx 35\text{ MB}$, macOS 11+ | Extract and drag `smart_reply_app.app` to Applications. |
 | **Linux (x64)** | `smart-reply-linux-x64.tar.gz` | $\approx 20\text{ MB}$, glibc 2.31+ | Extract `tar -xvf smart-reply-linux-x64.tar.gz` and run `./smart_reply_app`. |
@@ -60,6 +61,15 @@ You do not need to install Flutter, Node.js, or C++ compilers to use Smart Reply
 4. Highlight any message or press **`Ctrl + Shift + R`**.
 5. A dark-mode suggestion pill appears floating right next to your cursor.
 6. Click any suggestion: it instantly pastes into your active conversation via native `SendInput`!
+</details>
+
+<details>
+<summary><b>🌺 How to install on Huawei & HarmonyOS devices (Mate, Pura, MatePad)</b></summary>
+
+1. Download **`smart-reply-huawei-appgallery-release.apk`** from [GitHub Releases](https://github.com/mahmud-r-farhan/smart-reply-ai/releases/latest).
+2. Open **Files** or your browser downloads on your Huawei phone or tablet.
+3. Tap the file to install (100% GMS-free, zero Google service warnings).
+4. For developer AppGallery Connect submission instructions and HarmonyOS NEXT guide, read **[HUAWEI_HARMONYOS.md](HUAWEI_HARMONYOS.md)**.
 </details>
 
 <details>

@@ -52,6 +52,20 @@
             </intent-filter>
         </service>
 
+        <!-- Huawei AppGallery & HarmonyOS Foldable / Multi-Window Optimization -->
+        <meta-data
+            android:name="notch.config"
+            android:value="portrait|landscape" />
+        <meta-data
+            android:name="android.max_aspect"
+            android:value="2.4" />
+        <meta-data
+            android:name="EasyGoClient"
+            android:value="true" />
+        <meta-data
+            android:name="hw_multiwindow_support"
+            android:value="true" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

@@ -4,6 +4,9 @@ import 'package:smart_reply_app/services/heuristic_engine.dart';
 void main() {
   group('HeuristicEngine Tests', () {
     test('generateReplies generates contextual suggestions and completes in < 5ms', () {
+      // Warm-up to trigger JIT static class initialization
+      HeuristicEngine.generateReplies('warmup', 'professional');
+
       final stopwatch = Stopwatch()..start();
       final replies = HeuristicEngine.generateReplies('Can we meet tomorrow at 10 AM?', 'professional');
       stopwatch.stop();

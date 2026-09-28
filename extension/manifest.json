@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Smart Reply Assistant",
-  "version": "0.0.5",
+  "version": "1.1.0",
   "description": "AI-powered smart reply, enhancement, and translation for emails and messages",
   "permissions": [
     "activeTab",
