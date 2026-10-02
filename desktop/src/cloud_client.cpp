@@ -1,51 +1,18 @@
 #include "cloud_client.h"
+#include "json_utils.h"
 #include <windows.h>
 #include <wininet.h>
 #include <chrono>
 #include <iostream>
-#include <sstream>
 
 #pragma comment(lib, "wininet.lib")
 
 namespace SmartReply {
 
 std::vector<std::string> CloudClient::ParseJsonArray(const std::string& json) {
-    std::vector<std::string> results;
-    size_t start = json.find('[');
-    size_t end = json.rfind(']');
-
-    if (start != std::string::npos && end != std::string::npos && end > start) {
-        std::string arrayContent = json.substr(start + 1, end - start - 1);
-        std::stringstream ss(arrayContent);
-        std::string item;
-        bool inQuotes = false;
-        std::string current;
-
-        for (size_t i = 0; i < arrayContent.size(); ++i) {
-            char c = arrayContent[i];
-            if (c == '"' && (i == 0 || arrayContent[i - 1] != '\\')) {
-                inQuotes = !inQuotes;
-            } else if (c == ',' && !inQuotes) {
-                if (!current.empty()) {
-                    results.push_back(current);
-                    current.clear();
-                }
-            } else if (inQuotes) {
-                if (c == '\\' && i + 1 < arrayContent.size()) {
-                    if (arrayContent[i + 1] == 'n') { current += '\n'; i++; }
-                    else if (arrayContent[i + 1] == '"') { current += '"'; i++; }
-                    else { current += c; }
-                } else {
-                    current += c;
-                }
-            }
-        }
-        if (!current.empty()) {
-            results.push_back(current);
-        }
-    }
-
-    return results;
+    // Kept for API compatibility; delegates to the shared JSON helpers so the
+    // desktop client parses arrays exactly like every other Smart Reply client.
+    return JsonUtils::ParseStringArray(json);
 }
 
 bool CloudClient::PostHttpRequest(
@@ -163,28 +130,26 @@ std::vector<Suggestion> CloudClient::Complete(
 ) {
     auto start = std::chrono::high_resolution_clock::now();
 
+    if (config.baseURL.empty()) {
+        std::cerr << "[CloudClient] Provider base URL is empty" << std::endl;
+        return {};
+    }
+
     std::string endpoint = config.baseURL;
     if (endpoint.back() != '/') endpoint += "/";
     endpoint += "chat/completions";
 
-    // Escape prompt text for JSON
-    std::string escapedPrompt = "";
-    for (char c : prompt) {
-        if (c == '"') escapedPrompt += "\\\"";
-        else if (c == '\\') escapedPrompt += "\\\\";
-        else if (c == '\n') escapedPrompt += "\\n";
-        else if (c == '\r') continue;
-        else escapedPrompt += c;
-    }
-
+    // Escape every interpolated value: prompts can contain quotes, backslashes,
+    // tabs or newlines from the user's captured text and would otherwise produce
+    // invalid JSON (the system prompt and model id are just as untrusted).
     std::string jsonBody = "{"
-        "\"model\":\"" + config.model + "\","
+        "\"model\":\"" + JsonUtils::EscapeString(config.model) + "\","
         "\"messages\":["
-        "{\"role\":\"system\",\"content\":\"" + systemPrompt + "\"},"
-        "{\"role\":\"user\",\"content\":\"" + escapedPrompt + "\"}"
+        "{\"role\":\"system\",\"content\":\"" + JsonUtils::EscapeString(systemPrompt) + "\"},"
+        "{\"role\":\"user\",\"content\":\"" + JsonUtils::EscapeString(prompt) + "\"}"
         "],"
         "\"temperature\":0.7,"
-        "\"max_tokens\":" + std::to_string(config.maxTokens) +
+        "\"max_tokens\":" + std::to_string(config.maxTokens > 0 ? config.maxTokens : 300) +
     "}";
 
     std::string response;
@@ -201,18 +166,27 @@ std::vector<Suggestion> CloudClient::Complete(
         return {};
     }
 
-    // Extract content from choices[0].message.content
-    size_t contentPos = response.find("\"content\":");
-    if (contentPos == std::string::npos) return {};
+    // The provider wraps the model answer in `choices[0].message.content`, where
+    // the value is a JSON *string* — find and unescape it before parsing the
+    // inner array, otherwise the escaped quotes/switches confuse the parser.
+    std::string content;
+    if (!JsonUtils::ExtractStringValue(response, "content", content) || content.empty()) {
+        std::cerr << "[CloudClient] Response contained no message content" << std::endl;
+        return {};
+    }
 
-    std::string contentSnippet = response.substr(contentPos);
-    std::vector<std::string> rawList = ParseJsonArray(contentSnippet);
+    std::vector<std::string> rawList = JsonUtils::ParseStringArray(content);
+    if (rawList.empty()) {
+        // Some models answer with prose bullets instead of a JSON array.
+        rawList = JsonUtils::ParseLooseLines(content, 4);
+    }
 
     std::vector<Suggestion> results;
     for (const auto& item : rawList) {
         if (!item.empty()) {
             results.push_back({ item, "cloud-llm", latency, 0.96 });
         }
+        if (results.size() >= 4) break;
     }
 
     return results;

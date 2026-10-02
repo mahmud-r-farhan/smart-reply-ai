@@ -22,6 +22,16 @@ HWND g_mainWnd = nullptr;
 FloatingWindow* g_pFloatingWindow = nullptr;
 TrayManager* g_pTrayManager = nullptr;
 
+/// Bumped for every cloud request. Results carrying an older generation are
+/// dropped, so a slow reply to a previous selection can never overwrite the
+/// suggestions for the text the user asked about most recently.
+LONG g_cloudGeneration = 0;
+
+struct CloudResultPayload {
+    std::vector<Suggestion> suggestions;
+    LONG generation{ 0 };
+};
+
 /**
  * Fire-and-forget cloud upgrade. Runs the network call on a worker thread and
  * posts the answer back to the UI thread as WM_CLOUD_RESULT, so the overlay
@@ -30,13 +40,14 @@ TrayManager* g_pTrayManager = nullptr;
 static void StartCloudUpgrade(const std::string& input) {
     ProviderConfig providerCopy = g_settings.provider;
     std::string cloudPrompt = "Context: \"" + input + "\"\nGenerate 4 smart replies.";
+    const LONG generation = InterlockedIncrement(&g_cloudGeneration);
 
-    std::thread([providerCopy, cloudPrompt]() {
+    std::thread([providerCopy, cloudPrompt, generation]() {
         std::vector<Suggestion> cloudSuggestions =
             CloudClient::Complete(providerCopy, cloudPrompt);
         if (cloudSuggestions.empty() || !IsWindow(g_mainWnd)) return;
 
-        auto* payload = new std::vector<Suggestion>(std::move(cloudSuggestions));
+        auto* payload = new CloudResultPayload{ std::move(cloudSuggestions), generation };
         if (!PostMessageA(g_mainWnd, WM_CLOUD_RESULT, 0, reinterpret_cast<LPARAM>(payload))) {
             delete payload; // window already gone
         }
@@ -89,14 +100,15 @@ LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
         }
 
         case WM_CLOUD_RESULT: {
-            auto* cloudSuggestions = reinterpret_cast<std::vector<Suggestion>*>(lParam);
-            if (cloudSuggestions) {
-                POINT pt;
-                GetCursorPos(&pt);
-                if (g_pFloatingWindow) {
-                    g_pFloatingWindow->Show(*cloudSuggestions, pt);
+            auto* payload = reinterpret_cast<CloudResultPayload*>(lParam);
+            if (payload) {
+                // Ignore replies that belong to an older request.
+                if (payload->generation == g_cloudGeneration && g_pFloatingWindow) {
+                    POINT pt;
+                    GetCursorPos(&pt);
+                    g_pFloatingWindow->Show(payload->suggestions, pt);
                 }
-                delete cloudSuggestions;
+                delete payload;
             }
             return 0;
         }
