@@ -205,8 +205,7 @@ jobs:
       - name: Build and Run json_utils Tests (g++)
         working-directory: desktop
         run: |
-          g++ -std=c++17 -Wall -Wextra -Werror -Iinclude \
-            src/json_utils.cpp tests/json_utils_test.cpp -o json_utils_test
+          g++ -std=c++17 -Wall -Wextra -Werror -Iinclude src/json_utils.cpp tests/json_utils_test.cpp -o json_utils_test
           ./json_utils_test
 
   # ==========================================
