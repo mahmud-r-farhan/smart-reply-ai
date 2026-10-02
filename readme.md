@@ -277,8 +277,9 @@ smart-reply/
 │   └── src/              # Win32 GDI+ UI, WinINet cloud client, heuristic engine
 ├── backend/              # Node.js Express Universal Microservice
 │   ├── controllers/      # suggestReply, enhanceText, translateText, summarizeText
-│   ├── services/         # universalLlmService (OpenAI protocol), heuristicEngine
-│   ├── utils/            # cacheManager (SHA-256), singleflight, modelSelector, rateLimiter
+│   ├── services/         # openRouterService (universal OpenAI protocol), heuristicEngine
+│   ├── utils/            # cacheManager (L1 LRU + Redis L2), redisClient (RESP2), singleflight,
+│   │                     # modelSelector, providerResolver (SSRF guard), validation, rateLimiter
 │   └── server.js         # Express server with security headers & compression
 ├── smart_reply_app/      # Production Flutter Mobile App (Android & iOS)
 │   ├── android/          # WearableNotificationListenerService, SmartReplyWatchBridge (Kotlin)

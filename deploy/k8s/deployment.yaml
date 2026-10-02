@@ -35,6 +35,12 @@ spec:
               value: "5006"
             - name: WORKERS
               value: "2"
+            # One trusted hop: traffic arrives through the Ingress/LoadBalancer.
+            - name: TRUST_PROXY
+              value: "1"
+            # Optional shared L2 cache tier (fail-open when absent):
+            # - name: REDIS_URL
+            #   value: "redis://smart-reply-redis:6379"
             - name: OPENROUTER_API_KEY
               valueFrom:
                 secretKeyRef:
