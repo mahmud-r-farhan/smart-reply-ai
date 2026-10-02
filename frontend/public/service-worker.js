@@ -1,86 +1,89 @@
-const CACHE_NAME = 'smart-reply-v1';
+/* Smart Reply AI — service worker
+ * Strategy:
+ *   - navigations      : network-first (fresh HTML), falls back to cache then offline page
+ *   - static assets    : stale-while-revalidate (fast repeat loads)
+ *   - /api & cross-origin requests: never intercepted
+ */
+const CACHE_NAME = 'smart-reply-v2';
+const OFFLINE_URL = '/offline.html';
 
-const ASSETS_TO_CACHE = [
-  '/index.html',
-  '/offline.html',
-];
+const PRECACHE_URLS = ['/', '/index.html', OFFLINE_URL, '/manifest.json'];
 
-// INSTALL
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
-
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
+    caches
+      .open(CACHE_NAME)
+      .then((cache) => cache.addAll(PRECACHE_URLS))
+      .then(() => self.skipWaiting())
   );
 });
 
-// ACTIVATE
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) =>
-      Promise.all(
-        cacheNames.map((name) => {
-          if (name !== CACHE_NAME) {
-            return caches.delete(name);
-          }
-        })
-      )
-    )
+    (async () => {
+      const cacheNames = await caches.keys();
+      await Promise.all(
+        cacheNames.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))
+      );
+      if (self.registration.navigationPreload) {
+        await self.registration.navigationPreload.disable();
+      }
+      await self.clients.claim();
+    })()
   );
-
-  self.clients.claim();
 });
 
-// FETCH
+const isCacheableResponse = (response) =>
+  Boolean(response) && response.status === 200 && response.type === 'basic';
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
-  if (request.method !== 'GET') return;
+  if (request.method !== 'GET' || request.headers.get('range')) return;
 
   const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return; // never touch cross-origin traffic
+  if (url.pathname.startsWith('/api/')) return; // always live
 
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+  // --- Navigations: network first -------------------------------------
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      (async () => {
+        try {
+          const networkResponse = await fetch(request);
+          if (isCacheableResponse(networkResponse)) {
+            const cache = await caches.open(CACHE_NAME);
+            cache.put('/index.html', networkResponse.clone());
+          }
+          return networkResponse;
+        } catch {
+          const cached = (await caches.match('/index.html')) || (await caches.match('/'));
+          return cached || (await caches.match(OFFLINE_URL)) || Response.error();
+        }
+      })()
+    );
     return;
   }
 
+  // --- Static assets: stale-while-revalidate --------------------------
   event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-
-      return fetch(request)
-        .then((networkResponse) => {
-          // ❌ Only cache valid same-origin responses
-          if (
-            !networkResponse ||
-            networkResponse.status !== 200 ||
-            networkResponse.type !== 'basic'
-          ) {
-            return networkResponse;
+    (async () => {
+      const cached = await caches.match(request);
+      const network = fetch(request)
+        .then(async (response) => {
+          if (isCacheableResponse(response)) {
+            const cache = await caches.open(CACHE_NAME);
+            cache.put(request, response.clone());
           }
-
-          const responseClone = networkResponse.clone();
-
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseClone);
-          });
-
-          return networkResponse;
+          return response;
         })
-        .catch(() => {
-          // Offline fallback for navigation
-          if (request.mode === 'navigate') {
-            return caches.match('/offline.html');
-          }
-        });
-    })
+        .catch(() => undefined);
+
+      return cached || (await network) || new Response('', { status: 504, statusText: 'Offline' });
+    })()
   );
 });
 
-// MESSAGE
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();

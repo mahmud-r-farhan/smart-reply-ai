@@ -1,4 +1,3 @@
-import React from "react";
 import { motion } from "framer-motion";
 import { RotateCcw, Copy, Check } from "lucide-react";
 import LatencyBadge from "./LatencyBadge";

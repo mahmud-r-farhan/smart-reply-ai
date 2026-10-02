@@ -9,6 +9,13 @@ import '../utils/constants.dart';
 class ChatProvider extends ChangeNotifier {
   final HybridDispatcher _dispatcher;
   SettingsStorage? _storage;
+  bool _disposed = false;
+
+  /// Guards every async completion so a slow request cannot notify a
+  /// disposed provider (which would throw in debug builds).
+  void _safeNotify() {
+    if (!_disposed) notifyListeners();
+  }
 
   // State
   String _input = '';
@@ -31,10 +38,17 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<void> _initStorage() async {
-    _storage ??= await SettingsStorage.init();
-    _engineMode = _storage!.getEngineMode();
-    _providerConfig = _storage!.getProviderConfig();
-    notifyListeners();
+    try {
+      _storage ??= await SettingsStorage.init();
+      _engineMode = _storage!.getEngineMode();
+      _providerConfig = _storage!.getProviderConfig();
+      // Honours SMART_REPLY_BACKEND_URL / the saved backend setting: when no
+      // BYOK key is configured, cloud modes fall back to the self-hosted API.
+      _dispatcher.updateBackendUrl(_storage!.getBackendUrl());
+    } catch (error) {
+      debugPrint('Failed to load saved settings: $error');
+    }
+    _safeNotify();
   }
 
   // Getters
@@ -161,7 +175,7 @@ class ChatProvider extends ChangeNotifier {
       _error = e.toString().replaceFirst('Exception: ', '');
     } finally {
       _loading = false;
-      notifyListeners();
+      _safeNotify();
     }
   }
 
@@ -172,6 +186,7 @@ class ChatProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _dispatcher.dispose();
     super.dispose();
   }

@@ -1,4 +1,4 @@
-#include "../include/clipboard_hook.h"
+#include "clipboard_hook.h"
 #include <vector>
 #include <iostream>
 
@@ -7,15 +7,23 @@ namespace SmartReply {
 std::string ClipboardHook::GetClipboardText() {
     if (!OpenClipboard(nullptr)) return "";
 
-    HANDLE hData = GetClipboardData(CF_TEXT);
+    HANDLE hData = GetClipboardData(CF_UNICODETEXT);
     if (!hData) {
         CloseClipboard();
         return "";
     }
 
-    char* pszText = static_cast<char*>(GlobalLock(hData));
-    std::string text = (pszText ? pszText : "");
-    GlobalUnlock(hData);
+    auto* wideText = static_cast<wchar_t*>(GlobalLock(hData));
+    std::string text;
+    if (wideText) {
+        // Convert UTF-16 clipboard contents to UTF-8 for the rest of the app.
+        int utf8Length = WideCharToMultiByte(CP_UTF8, 0, wideText, -1, nullptr, 0, nullptr, nullptr);
+        if (utf8Length > 1) {
+            text.resize(static_cast<size_t>(utf8Length - 1));
+            WideCharToMultiByte(CP_UTF8, 0, wideText, -1, text.data(), utf8Length, nullptr, nullptr);
+        }
+        GlobalUnlock(hData);
+    }
     CloseClipboard();
 
     return text;
@@ -24,17 +32,34 @@ std::string ClipboardHook::GetClipboardText() {
 bool ClipboardHook::SetClipboardText(const std::string& text) {
     if (!OpenClipboard(nullptr)) return false;
 
-    EmptyClipboard();
-    HGLOBAL hGlob = GlobalAlloc(GMEM_MOVEABLE, text.size() + 1);
+    // Convert UTF-8 to UTF-16 so emoji and non-Latin scripts survive paste.
+    int wideLength = MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, nullptr, 0);
+    if (wideLength <= 0) {
+        CloseClipboard();
+        return false;
+    }
+
+    HGLOBAL hGlob = GlobalAlloc(GMEM_MOVEABLE, static_cast<size_t>(wideLength) * sizeof(wchar_t));
     if (!hGlob) {
         CloseClipboard();
         return false;
     }
 
-    memcpy(GlobalLock(hGlob), text.c_str(), text.size() + 1);
+    auto* wideBuffer = static_cast<wchar_t*>(GlobalLock(hGlob));
+    if (!wideBuffer) {
+        GlobalFree(hGlob);
+        CloseClipboard();
+        return false;
+    }
+    MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, wideBuffer, wideLength);
     GlobalUnlock(hGlob);
 
-    SetClipboardData(CF_TEXT, hGlob);
+    EmptyClipboard();
+    if (!SetClipboardData(CF_UNICODETEXT, hGlob)) {
+        GlobalFree(hGlob);
+        CloseClipboard();
+        return false;
+    }
     CloseClipboard();
     return true;
 }
@@ -80,6 +105,9 @@ std::string ClipboardHook::CaptureSelectedText(HWND targetWnd) {
     if (selectedText.empty()) {
         selectedText = previousClipboard;
     }
+
+    // Put the user's clipboard back the way we found it.
+    RestoreClipboard(previousClipboard);
 
     return selectedText;
 }

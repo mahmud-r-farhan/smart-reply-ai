@@ -1,24 +1,31 @@
-import { generateSummaries, FORMATS, isValidFormat } from "../services/openRouterService.js";
+import { generateSummaries } from "../services/openRouterService.js";
+import { FORMATS, FORMAT_ALIASES } from "../utils/modelSelector.js";
+import {
+  LIMITS,
+  requireText,
+  requireFormat,
+  requireProviderConfig,
+} from "../utils/validation.js";
 
 export const summarizeText = async (req, res, next) => {
   try {
-    const { text, format = FORMATS.CONCISE, providerConfig } = req.body;
+    const text = requireText(req.body?.text, { field: "Text", max: LIMITS.SUMMARIZE });
+    const format = requireFormat(req.body?.format, {
+      fallback: FORMATS.CONCISE,
+      validFormats: Object.values(FORMATS),
+      aliases: FORMAT_ALIASES,
+    });
+    const providerConfig = requireProviderConfig(req.body?.providerConfig);
+    const options = { refresh: req.body?.refresh === true };
 
-    // Validation
-    if (!text || text.trim().length === 0) {
-      return res.status(400).json({ error: "Text to summarize is required" });
-    }
-    if (text.length > 8000) {
-      return res.status(400).json({ error: "Text must be under 8000 characters" });
-    }
-    if (!isValidFormat(format)) {
-      return res.status(400).json({ 
-        error: `Invalid format. Supported formats: ${Object.values(FORMATS).join(", ")}` 
-      });
-    }
+    const { results, source, latencyMs, model } = await generateSummaries(
+      text,
+      format,
+      providerConfig,
+      options
+    );
 
-    const summaries = await generateSummaries(text.trim(), format, providerConfig);
-    res.json({ summaries });
+    res.json({ summaries: results, source, latencyMs, model });
   } catch (error) {
     next(error);
   }

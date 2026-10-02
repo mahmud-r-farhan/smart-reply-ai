@@ -1,24 +1,34 @@
-import { generateSuggestions, FORMATS, isValidFormat } from "../services/openRouterService.js";
+import { generateSuggestions } from "../services/openRouterService.js";
+import { FORMATS, FORMAT_ALIASES } from "../utils/modelSelector.js";
+import {
+  LIMITS,
+  requireText,
+  requireFormat,
+  requireProviderConfig,
+} from "../utils/validation.js";
 
 export const suggestReply = async (req, res, next) => {
   try {
-    const { message, format = FORMATS.PROFESSIONAL, providerConfig } = req.body;
+    const message = requireText(req.body?.message, {
+      field: "Message",
+      max: LIMITS.SUGGEST,
+    });
+    const format = requireFormat(req.body?.format, {
+      fallback: FORMATS.PROFESSIONAL,
+      validFormats: Object.values(FORMATS),
+      aliases: FORMAT_ALIASES,
+    });
+    const providerConfig = requireProviderConfig(req.body?.providerConfig);
+    const options = { refresh: req.body?.refresh === true };
 
-    // Validation
-    if (!message || message.trim().length === 0) {
-      return res.status(400).json({ error: "Message is required" });
-    }
-    if (message.length > 2000) {
-      return res.status(400).json({ error: "Message must be under 2000 characters" });
-    }
-    if (!isValidFormat(format)) {
-      return res.status(400).json({ 
-        error: `Invalid format. Supported formats: ${Object.values(FORMATS).join(", ")}` 
-      });
-    }
+    const { results, source, latencyMs, model } = await generateSuggestions(
+      message,
+      format,
+      providerConfig,
+      options
+    );
 
-    const suggestions = await generateSuggestions(message.trim(), format, providerConfig);
-    res.json({ suggestions });
+    res.json({ suggestions: results, source, latencyMs, model });
   } catch (error) {
     next(error);
   }

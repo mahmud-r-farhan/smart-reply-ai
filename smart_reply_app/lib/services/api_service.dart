@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/provider_config.dart';
 import '../models/reply_suggestion.dart';
+import '../utils/app_config.dart';
 import '../utils/constants.dart';
 
 class ApiService {
@@ -10,7 +11,7 @@ class ApiService {
 
   ApiService({http.Client? client, String? baseUrl})
       : _client = client ?? http.Client(),
-        _baseUrl = baseUrl ?? ApiConstants.defaultLocalUrl;
+        _baseUrl = baseUrl ?? AppConfig.baseUrl;
 
   void updateBaseUrl(String url) {
     _baseUrl = url.trim();
@@ -101,7 +102,7 @@ class ApiService {
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 15));
+      ).timeout(ContentLimits.requestTimeout);
 
       stopwatch.stop();
 

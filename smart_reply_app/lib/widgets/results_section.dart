@@ -44,6 +44,15 @@ class _ResultsSectionState extends State<ResultsSection> with SingleTickerProvid
   }
 
   @override
+  void didUpdateWidget(covariant ResultsSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Replay the entrance animation whenever a fresh batch of results arrives.
+    if (widget.results.isNotEmpty && widget.results != oldWidget.results) {
+      _animationController.forward(from: 0);
+    }
+  }
+
+  @override
   void dispose() {
     _animationController.dispose();
     super.dispose();

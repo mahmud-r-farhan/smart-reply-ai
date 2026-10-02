@@ -131,7 +131,7 @@ class DeveloperSidePanel extends StatelessWidget {
                         context,
                         'App',
                         [
-                          _buildInfoRow(context, 'Name', 'Smart Reply'),
+                          _buildInfoRow(context, 'Name', 'Smart Reply AI'),
                           _buildInfoRow(context, 'Version', '0.2.0'),
                           _buildInfoRow(context, 'License', 'MIT'),
                         ],

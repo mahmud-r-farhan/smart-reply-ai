@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useChatStore } from "./store/useChatStore";
 import Header from "./components/Header.jsx";
 import EngineModeSelector from "./components/EngineModeSelector.jsx";
@@ -34,27 +34,68 @@ export default function App() {
     setEngineMode,
     setProviderConfig,
     getResults,
-    clear
+    clear,
+    cancelRequest
   } = useChatStore();
 
   const [copiedIndex, setCopiedIndex] = useState(null);
+  const copyResetTimer = useRef(null);
   const [showStyleInfo, setShowStyleInfo] = useState(false);
   const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
+
+  // Abort any in-flight generation (and pending timers) when the app unmounts.
+  useEffect(
+    () => () => {
+      cancelRequest();
+      clearTimeout(copyResetTimer.current);
+    },
+    [cancelRequest]
+  );
 
   const handleSubmit = useCallback(async () => {
     if (!input.trim()) return;
     await getResults();
   }, [input, getResults]);
 
+  // "Regenerate" re-runs the same prompt but asks the backend to skip its
+  // cache read, so the user actually gets a fresh answer.
   const handleRegenerate = useCallback(async () => {
-    await getResults();
-  }, [getResults]);
+    if (!input.trim()) return;
+    await getResults({ refresh: true });
+  }, [input, getResults]);
 
-  const handleCopy = useCallback((text, index) => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopiedIndex(index);
-      setTimeout(() => setCopiedIndex(null), 2000);
-    });
+  const handleCopy = useCallback(async (text, index) => {
+    let copied = false;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        copied = true;
+      }
+    } catch {
+      copied = false;
+    }
+
+    // Fallback for insecure origins / older WebViews without the async API.
+    if (!copied) {
+      try {
+        const area = document.createElement("textarea");
+        area.value = text;
+        area.setAttribute("readonly", "");
+        area.style.position = "fixed";
+        area.style.opacity = "0";
+        document.body.appendChild(area);
+        area.select();
+        copied = document.execCommand("copy");
+        document.body.removeChild(area);
+      } catch {
+        copied = false;
+      }
+    }
+
+    if (!copied) return;
+    setCopiedIndex(index);
+    clearTimeout(copyResetTimer.current);
+    copyResetTimer.current = setTimeout(() => setCopiedIndex(null), 2000);
   }, []);
 
   // Memoize background animation to prevent re-renders
@@ -94,7 +135,7 @@ export default function App() {
       />
 
       <div className="relative max-w-5xl mx-auto">
-        <Header onOpenProviderSettings={() => setIsProviderModalOpen(true)} />
+        <Header />
 
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
@@ -145,7 +186,6 @@ export default function App() {
             loading={loading} 
             handleRegenerate={handleRegenerate} 
             copiedIndex={copiedIndex} 
-            setCopiedIndex={setCopiedIndex} 
             handleCopy={handleCopy} 
             mode={mode}
             latencyMs={latencyMs}

@@ -4,13 +4,38 @@ import '../models/provider_config.dart';
 import '../models/reply_suggestion.dart';
 import 'heuristic_engine.dart';
 import 'cloud_llm_engine.dart';
+import 'api_service.dart';
 
 /// Orchestrates smart reply generation between on-device heuristics and cloud LLMs.
 class HybridDispatcher {
   final CloudLlmEngine _cloudEngine;
 
-  HybridDispatcher({CloudLlmEngine? cloudEngine})
-      : _cloudEngine = cloudEngine ?? CloudLlmEngine();
+  /// Optional self-hosted backend bridge. Enabled from SettingsStorage so the
+  /// app can use a deployed Smart Reply backend when no BYOK key is present.
+  ApiService? _apiService;
+
+  HybridDispatcher({CloudLlmEngine? cloudEngine, ApiService? apiService})
+      : _cloudEngine = cloudEngine ?? CloudLlmEngine(),
+        _apiService = apiService;
+
+  /// Point the dispatcher at a backend base URL (empty string disables it).
+  void updateBackendUrl(String url) {
+    final clean = url.trim();
+    _apiService = clean.isEmpty ? null : ApiService(baseUrl: clean);
+  }
+
+  /// Best-effort backend call: never throws, returns [] when unavailable.
+  Future<List<ReplySuggestion>> _backendOrEmpty(
+    Future<List<ReplySuggestion>> Function(ApiService api) call,
+  ) async {
+    final api = _apiService;
+    if (api == null) return const [];
+    try {
+      return await call(api);
+    } catch (_) {
+      return const [];
+    }
+  }
 
   /// Primary dispatch entrypoint for Smart Reply
   Future<List<ReplySuggestion>> dispatchReply({
@@ -28,8 +53,20 @@ class HybridDispatcher {
     final prompt = 'Context message: "$message"\n'
         'Task: Generate 4 distinct smart replies in tone "$tone". Output strictly a JSON array of strings: ["r1", "r2", "r3", "r4"].';
 
+    final hasCredentials = providerConfig.apiKey.isNotEmpty ||
+        providerConfig.baseURL.contains('localhost') ||
+        providerConfig.baseURL.contains('127.0.0.1');
+
     // 2. Cloud Only mode
     if (mode == EngineMode.cloudOnly) {
+      if (!hasCredentials) {
+        final backendResults = await _backendOrEmpty(
+          (api) => api.suggestReply(message: message, format: tone),
+        );
+        return backendResults.isNotEmpty
+            ? backendResults
+            : HeuristicEngine.generateReplies(message, tone);
+      }
       return await _cloudEngine.complete(
         config: providerConfig,
         prompt: prompt,
@@ -37,10 +74,17 @@ class HybridDispatcher {
       );
     }
 
-    // 3. Fallback mode: Try cloud, if fails use on-device
+    // 3. Fallback mode: Try cloud, if fails use on-device (the shared backend
+    // counts as cloud when no BYOK key is configured)
     if (mode == EngineMode.fallback) {
+      if (!hasCredentials) {
+        final backendResults = await _backendOrEmpty(
+          (api) => api.suggestReply(message: message, format: tone),
+        );
+        if (backendResults.isNotEmpty) return backendResults;
+      }
       try {
-        if (providerConfig.apiKey.isNotEmpty || providerConfig.baseURL.contains('localhost')) {
+        if (hasCredentials) {
           final cloudResults = await _cloudEngine.complete(
             config: providerConfig,
             prompt: prompt,
@@ -57,10 +101,14 @@ class HybridDispatcher {
     // Run heuristic instantly
     final localResults = HeuristicEngine.generateReplies(message, tone);
 
-    // If no API key configured and not a local server, return local immediately
-    final isLocalServer = providerConfig.baseURL.contains('localhost') || providerConfig.baseURL.contains('127.0.0.1');
-    if (providerConfig.apiKey.isEmpty && !isLocalServer) {
-      return localResults;
+    // No BYOK key and not a local server: the shared backend (when configured)
+    // is the only cloud option left. Its result replaces the local answer when
+    // it arrives; otherwise the instant local answer stands.
+    if (!hasCredentials) {
+      final backendResults = await _backendOrEmpty(
+        (api) => api.suggestReply(message: message, format: tone),
+      );
+      return backendResults.isNotEmpty ? backendResults : localResults;
     }
 
     // Race cloud engine against timeout
@@ -96,7 +144,19 @@ class HybridDispatcher {
     final prompt = 'Text to enhance: "$text"\n'
         'Task: Rewrite and enhance this text in "$tone" tone. Improve clarity and impact. Output strictly a JSON array of 4 variations: ["v1", "v2", "v3", "v4"].';
 
+    final hasCredentials = providerConfig.apiKey.isNotEmpty ||
+        providerConfig.baseURL.contains('localhost') ||
+        providerConfig.baseURL.contains('127.0.0.1');
+
     if (mode == EngineMode.cloudOnly) {
+      if (!hasCredentials) {
+        final backendResults = await _backendOrEmpty(
+          (api) => api.enhanceText(text: text, format: tone),
+        );
+        return backendResults.isNotEmpty
+            ? backendResults
+            : HeuristicEngine.enhanceText(text, tone);
+      }
       return await _cloudEngine.complete(
         config: providerConfig,
         prompt: prompt,
@@ -105,6 +165,12 @@ class HybridDispatcher {
     }
 
     final localResults = HeuristicEngine.enhanceText(text, tone);
+    if (!hasCredentials) {
+      final backendResults = await _backendOrEmpty(
+        (api) => api.enhanceText(text: text, format: tone),
+      );
+      return backendResults.isNotEmpty ? backendResults : localResults;
+    }
 
     try {
       final cloudResults = await _cloudEngine.complete(
@@ -135,7 +201,23 @@ class HybridDispatcher {
     final prompt = 'Translate into $targetLanguage ($tone tone):\n"$text"\n'
         'Output strictly a JSON array of 4 variations (e.g. natural, polite, direct, concise): ["t1", "t2", "t3", "t4"].';
 
+    final hasCredentials = providerConfig.apiKey.isNotEmpty ||
+        providerConfig.baseURL.contains('localhost') ||
+        providerConfig.baseURL.contains('127.0.0.1');
+
     if (mode == EngineMode.cloudOnly) {
+      if (!hasCredentials) {
+        final backendResults = await _backendOrEmpty(
+          (api) => api.translateText(
+            text: text,
+            language: targetLanguage,
+            format: tone,
+          ),
+        );
+        return backendResults.isNotEmpty
+            ? backendResults
+            : HeuristicEngine.translateText(text, targetLanguage, tone);
+      }
       return await _cloudEngine.complete(
         config: providerConfig,
         prompt: prompt,
@@ -144,6 +226,16 @@ class HybridDispatcher {
     }
 
     final localResults = HeuristicEngine.translateText(text, targetLanguage, tone);
+    if (!hasCredentials) {
+      final backendResults = await _backendOrEmpty(
+        (api) => api.translateText(
+          text: text,
+          language: targetLanguage,
+          format: tone,
+        ),
+      );
+      return backendResults.isNotEmpty ? backendResults : localResults;
+    }
 
     try {
       final cloudResults = await _cloudEngine.complete(
@@ -172,7 +264,19 @@ class HybridDispatcher {
     final prompt = 'Summarize the following text:\n"$text"\n'
         'Provide 4 perspectives: executive summary, key takeaway, bullet list, and brief recap. Output strictly a JSON array of 4 strings: ["s1", "s2", "s3", "s4"].';
 
+    final hasCredentials = providerConfig.apiKey.isNotEmpty ||
+        providerConfig.baseURL.contains('localhost') ||
+        providerConfig.baseURL.contains('127.0.0.1');
+
     if (mode == EngineMode.cloudOnly) {
+      if (!hasCredentials) {
+        final backendResults = await _backendOrEmpty(
+          (api) => api.summarizeText(text: text, format: 'concise'),
+        );
+        return backendResults.isNotEmpty
+            ? backendResults
+            : HeuristicEngine.summarizeText(text);
+      }
       return await _cloudEngine.complete(
         config: providerConfig,
         prompt: prompt,
@@ -181,6 +285,12 @@ class HybridDispatcher {
     }
 
     final localResults = HeuristicEngine.summarizeText(text);
+    if (!hasCredentials) {
+      final backendResults = await _backendOrEmpty(
+        (api) => api.summarizeText(text: text, format: 'concise'),
+      );
+      return backendResults.isNotEmpty ? backendResults : localResults;
+    }
 
     try {
       final cloudResults = await _cloudEngine.complete(
@@ -197,5 +307,6 @@ class HybridDispatcher {
 
   void dispose() {
     _cloudEngine.dispose();
+    _apiService?.dispose();
   }
 }

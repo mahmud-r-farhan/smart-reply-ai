@@ -1,6 +1,8 @@
-// Ensure chrome API is available
-if (typeof chrome !== 'undefined' && chrome.runtime) {
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+// Support both Chrome (callback/promise) and Firefox (browser.*) namespaces.
+const extensionApi = typeof chrome !== 'undefined' ? chrome : typeof browser !== 'undefined' ? browser : null;
+
+if (extensionApi?.runtime) {
+  extensionApi.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "getSelectedText") {
       try {
         const text = window.getSelection().toString();
@@ -23,7 +25,15 @@ if (typeof chrome !== 'undefined' && chrome.runtime) {
 function insertTextIntoActiveField(text) {
   const activeElement = document.activeElement;
 
-  if (activeElement && (activeElement.tagName === "TEXTAREA" || activeElement.tagName === "INPUT")) {
+  const isTextInput =
+    activeElement &&
+    (activeElement.tagName === "TEXTAREA" ||
+      (activeElement.tagName === "INPUT" &&
+        ["text", "search", "url", "tel", "email", "password", ""].includes(
+          (activeElement.getAttribute("type") || "text").toLowerCase()
+        )));
+
+  if (activeElement && isTextInput) {
     const start = activeElement.selectionStart ?? activeElement.value.length;
     const end = activeElement.selectionEnd ?? start;
     const currentValue = activeElement.value;
@@ -32,7 +42,8 @@ function insertTextIntoActiveField(text) {
     const newPos = start + text.length;
     activeElement.selectionStart = activeElement.selectionEnd = newPos;
 
-    activeElement.dispatchEvent(new Event("input", { bubbles: true }));
+    // React/Vue controlled inputs need a native setter + InputEvent to notice.
+    activeElement.dispatchEvent(new InputEvent("input", { bubbles: true, data: text, inputType: "insertText" }));
     activeElement.dispatchEvent(new Event("change", { bubbles: true }));
   } else if (activeElement && activeElement.isContentEditable) {
     const sel = window.getSelection();

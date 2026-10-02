@@ -7,7 +7,7 @@ Welcome to the **SmartReply AI Developer Guide**. This document contains in-dept
 ## 1. Engine Protocols
 
 ### A. Universal OpenAI-Compatible Cloud Protocol
-All clients (Flutter, React, Extension, Win32 C++, Rust) communicate with cloud providers using the standard OpenAI chat completions endpoint:
+All clients (Flutter, React, Chrome Extension, HarmonyOS ArkTS, Win32 C++) communicate with cloud providers using the standard OpenAI chat completions endpoint:
 - **Default Endpoint**: `POST {baseUrl}/chat/completions`
 - **Request Headers**:
   - `Content-Type: application/json`

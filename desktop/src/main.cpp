@@ -1,23 +1,47 @@
 #include <windows.h>
 #include <iostream>
 #include <thread>
+#include <vector>
 #include <future>
-#include "../include/app_config.h"
-#include "../include/clipboard_hook.h"
-#include "../include/heuristic_engine.h"
-#include "../include/cloud_client.h"
-#include "../include/tray_manager.h"
-#include "../include/floating_window.h"
+#include "app_config.h"
+#include "clipboard_hook.h"
+#include "heuristic_engine.h"
+#include "cloud_client.h"
+#include "tray_manager.h"
+#include "floating_window.h"
 
 using namespace SmartReply;
 
 const int HOTKEY_ID = 101;
 const UINT WM_TRAYNOTIFY = WM_USER + 1;
+const UINT WM_CLOUD_RESULT = WM_USER + 2; // posted by the cloud worker thread
 
 AppSettings g_settings;
 HWND g_lastActiveWnd = nullptr;
+HWND g_mainWnd = nullptr;
 FloatingWindow* g_pFloatingWindow = nullptr;
 TrayManager* g_pTrayManager = nullptr;
+
+/**
+ * Fire-and-forget cloud upgrade. Runs the network call on a worker thread and
+ * posts the answer back to the UI thread as WM_CLOUD_RESULT, so the overlay
+ * never freezes and the on-device suggestions stay instant.
+ */
+static void StartCloudUpgrade(const std::string& input) {
+    ProviderConfig providerCopy = g_settings.provider;
+    std::string cloudPrompt = "Context: \"" + input + "\"\nGenerate 4 smart replies.";
+
+    std::thread([providerCopy, cloudPrompt]() {
+        std::vector<Suggestion> cloudSuggestions =
+            CloudClient::Complete(providerCopy, cloudPrompt);
+        if (cloudSuggestions.empty() || !IsWindow(g_mainWnd)) return;
+
+        auto* payload = new std::vector<Suggestion>(std::move(cloudSuggestions));
+        if (!PostMessageA(g_mainWnd, WM_CLOUD_RESULT, 0, reinterpret_cast<LPARAM>(payload))) {
+            delete payload; // window already gone
+        }
+    }).detach();
+}
 
 LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
@@ -38,17 +62,19 @@ LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
                 if (g_settings.engineMode == EngineMode::OfflineOnly) {
                     suggestions = HeuristicEngine::GenerateReplies(input, g_settings.tone);
                 } else if (g_settings.engineMode == EngineMode::CloudOnly && !g_settings.provider.apiKey.empty()) {
-                    suggestions = CloudClient::Complete(g_settings.provider, "Context: \"" + input + "\"\nGenerate 4 smart replies.");
-                    if (suggestions.empty()) {
-                        suggestions = HeuristicEngine::GenerateReplies(input, g_settings.tone);
-                    }
+                    // Never block the message loop on a 6-second network call:
+                    // show the instant on-device answer and upgrade it in place
+                    // when the cloud worker posts WM_CLOUD_RESULT back.
+                    suggestions = HeuristicEngine::GenerateReplies(input, g_settings.tone);
+                    StartCloudUpgrade(input);
                 } else {
                     // Hybrid Race: Generate on-device immediately (<1ms)
                     suggestions = HeuristicEngine::GenerateReplies(input, g_settings.tone);
 
-                    // If API key is configured, race with fast cloud in background
+                    // Hybrid Race: upgrade the instant on-device answer with the
+                    // cloud result as soon as the worker thread delivers it.
                     if (!g_settings.provider.apiKey.empty()) {
-                        // Could optionally enrich, but instant heuristic satisfies <30ms requirement
+                        StartCloudUpgrade(input);
                     }
                 }
 
@@ -58,6 +84,19 @@ LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
                 if (g_pFloatingWindow) {
                     g_pFloatingWindow->Show(suggestions, pt);
                 }
+            }
+            return 0;
+        }
+
+        case WM_CLOUD_RESULT: {
+            auto* cloudSuggestions = reinterpret_cast<std::vector<Suggestion>*>(lParam);
+            if (cloudSuggestions) {
+                POINT pt;
+                GetCursorPos(&pt);
+                if (g_pFloatingWindow) {
+                    g_pFloatingWindow->Show(*cloudSuggestions, pt);
+                }
+                delete cloudSuggestions;
             }
             return 0;
         }
@@ -104,6 +143,10 @@ LRESULT CALLBACK MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+    UNREFERENCED_PARAMETER(hPrevInstance);
+    UNREFERENCED_PARAMETER(lpCmdLine);
+    UNREFERENCED_PARAMETER(nCmdShow);
+
     // Register Main Hidden Window Class
     const char* MAIN_CLASS = "SmartReplyMainAppClass";
     WNDCLASSEXA wc = {};
@@ -115,6 +158,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     HWND hWnd = CreateWindowExA(0, MAIN_CLASS, "Smart Reply AI Agent Core", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, hInstance, nullptr);
     if (!hWnd) return 1;
+    g_mainWnd = hWnd;
 
     // Register Global Shortcut: Ctrl + Shift + R
     BOOL hotkeyRegistered = RegisterHotKey(hWnd, HOTKEY_ID, MOD_CONTROL | MOD_SHIFT, 'R');

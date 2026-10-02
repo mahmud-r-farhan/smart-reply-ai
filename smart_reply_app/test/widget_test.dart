@@ -8,6 +8,7 @@ void main() {
     await tester.pumpWidget(const SmartReplyApp());
 
     // Verify that the app title is present
-    expect(find.text('Smart Reply'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Smart Reply AI'), findsOneWidget);
   });
 }

@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Key, Cpu, Sparkles, Check, ExternalLink } from "lucide-react";
+import { X, Key, Cpu, Check } from "lucide-react";
 import { PROVIDER_PRESETS } from "../utils/universalCloudEngine";
 
 export default function ProviderModal({ isOpen, onClose, currentConfig, onSave }) {
@@ -9,7 +9,24 @@ export default function ProviderModal({ isOpen, onClose, currentConfig, onSave }
   const [model, setModel] = useState(currentConfig?.model || PROVIDER_PRESETS[0].model);
   const [temperature, setTemperature] = useState(currentConfig?.temperature ?? 0.7);
 
-  if (!isOpen) return null;
+  // Re-sync the form with the saved config every time the modal opens.
+  useEffect(() => {
+    if (!isOpen) return;
+    setBaseURL(currentConfig?.baseURL || PROVIDER_PRESETS[0].baseURL);
+    setApiKey(currentConfig?.apiKey || "");
+    setModel(currentConfig?.model || PROVIDER_PRESETS[0].model);
+    setTemperature(currentConfig?.temperature ?? 0.7);
+  }, [isOpen, currentConfig]);
+
+  // Close on Escape while the dialog is open.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, onClose]);
 
   const handleApplyPreset = (preset) => {
     setBaseURL(preset.baseURL);
@@ -29,7 +46,13 @@ export default function ProviderModal({ isOpen, onClose, currentConfig, onSave }
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+      {isOpen && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Cloud AI Provider settings"
+      >
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -163,6 +186,7 @@ export default function ProviderModal({ isOpen, onClose, currentConfig, onSave }
           </div>
         </motion.div>
       </div>
+      )}
     </AnimatePresence>
   );
 }

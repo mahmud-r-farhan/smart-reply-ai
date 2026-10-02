@@ -31,7 +31,7 @@ jobs:
 
       - name: Install Dependencies
         working-directory: backend
-        run: npm install
+        run: npm ci
 
       - name: Run Test Suite
         working-directory: backend
@@ -57,7 +57,11 @@ jobs:
 
       - name: Install Dependencies
         working-directory: frontend
-        run: npm install
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
 
       - name: Build Production Assets
         working-directory: frontend
@@ -81,11 +85,44 @@ jobs:
 
       - name: Install Dependencies
         working-directory: demo
-        run: npm install
+        run: npm ci
 
       - name: Build Demo Web Application
         working-directory: demo
         run: npm run build
+
+  # ==========================================
+  # 2c. Backend Container Build (Dockerfile regression guard)
+  # ==========================================
+  backend-docker-build:
+    name: Backend Container Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Build Production Image
+        run: docker build -t smart-reply-backend:ci ./backend
+
+      - name: Smoke Test Image (health endpoint)
+        run: |
+          docker run -d --name smart-reply-ci -p 5006:5006 smart-reply-backend:ci
+          healthy=0
+          for i in $(seq 1 20); do
+            if curl -fsS http://localhost:5006/health > /dev/null; then
+              healthy=1
+              echo "Health check passed"
+              break
+            fi
+            sleep 1
+          done
+          docker logs smart-reply-ci
+          docker rm -f smart-reply-ci
+          if [ "$healthy" != "1" ]; then
+            echo "Container never became healthy" >&2
+            exit 1
+          fi
 
   # ==========================================
   # 3. Flutter Multiplatform Analysis & Tests

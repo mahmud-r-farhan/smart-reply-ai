@@ -388,6 +388,12 @@ npm install
 npm run dev
 ```
 
+The app runs on `http://localhost:5173` and proxies `/api` to the backend on
+`http://localhost:5006`, so start the backend first for shared cloud/backend mode.
+Point `VITE_API_ENDPOINT` at a deployed backend for production builds, or use the
+built-in BYOK panel (Groq / OpenRouter / OpenAI / Ollama) — the zero-latency
+on-device heuristics always work with no configuration at all.
+
 ---
 
 ## API Reference
@@ -439,16 +445,38 @@ Summarizes text into key takeaways, bullets, and executive recap.
 ### 5. `GET /api/providers`
 Discovers supported cloud provider presets, model IDs, and format options.
 
-### 6. `GET /health`
-Returns microservice health status, memory consumption, cache hit ratios, and uptime.
+### Response envelope
+Every generation endpoint returns the suggestions plus provenance metadata:
+
+```json
+{
+  "suggestions": ["Sounds great, see you at 3!", "..."],
+  "source": "cloud-llm | cache | heuristic",
+  "latencyMs": 412,
+  "model": "llama-3.1-8b-instant"
+}
+```
+
+### 6. `GET /api/stats`
+Real-time telemetry: cache hit ratio, evictions, distributed (Redis) hits, single-flight depth, and memory usage.
+
+### 7. `GET /health` · `GET /ready`
+Liveness/readiness probes used by Docker, Kubernetes, and the Nginx load balancer.
+
+> **Security note** — client-supplied `providerConfig.baseURL` values are only accepted for known provider origins
+> (OpenRouter, Groq, OpenAI, local Ollama on port 11434). The server-side API key is **never** attached to a
+> non-allowlisted endpoint, which blocks SSRF and credential-exfiltration attempts. Self-hosted gateways can be
+> opted in with `LLM_ALLOWED_HOSTS` or `ALLOW_CUSTOM_LLM_ENDPOINT=true` (see `backend/.env.example`).
 
 ---
 
 ## Scaling, Singleflight Caching & Performance
 
 * **SHA-256 Content-Addressed Cache:** Identical prompts with the same parameters return in $< 1\text{ ms}$ from memory without hitting LLM rate limits.
+* **Multi-Tier Cache:** Each worker keeps a bounded LRU tier; set `REDIS_URL` and horizontally scaled replicas share warm results through an optional Redis L2 tier (dependency-free RESP client with fail-open circuit breaker — Redis outages never break requests).
 * **Singleflight Request Deduplication:** Prevents cache stampedes. When 500 concurrent users request suggestions for the same message, only **1 upstream request** is executed while all 499 other callers await and share the single result.
 * **Deterministic Sub-1ms Execution:** Local heuristic engines on Android, iOS, Windows C++, HarmonyOS, and Web guarantee high-quality suggestions even when offline or air-gapped.
+* **Tunable Under Load:** `WORKERS`, `CACHE_TTL_MS`, `CACHE_MAX_ENTRIES`, `RATE_LIMIT_*`, `LLM_TIMEOUT_MS`, `LLM_RETRIES`, and `TRUST_PROXY` are all environment-driven (see [`backend/.env.example`](backend/.env.example)).
 
 ---
 

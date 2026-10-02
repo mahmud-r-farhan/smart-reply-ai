@@ -38,7 +38,7 @@ const INTENT_PATTERNS = [
         "Greetings, how may I assist?",
         "Hello!"
       ],
-      flating: [
+      flirty: [
         "Hey there! You just brightened up my whole day! 😉",
         "Hello pleasant surprise! What can I do for you?",
         "Hey! Seeing your name pop up always makes me smile.",
@@ -85,7 +85,7 @@ const INTENT_PATTERNS = [
         "Great! How's your day?",
         "Good, thanks for asking."
       ],
-      flating: [
+      flirty: [
         "Much better now that you've messaged me! 😉",
         "Can't complain, especially now that I'm talking to you.",
         "Doing great, but definitely thinking of you!",
@@ -132,7 +132,7 @@ const INTENT_PATTERNS = [
         "Available. Share details.",
         "Let's do it. What time suits you?"
       ],
-      flating: [
+      flirty: [
         "I'd clear my whole schedule just to catch up with you! 😉",
         "A meeting with you is definitely the highlight of my week.",
         "Any time spent talking to you is time well spent!",
@@ -179,7 +179,7 @@ const INTENT_PATTERNS = [
         "No problem.",
         "Anytime!"
       ],
-      flating: [
+      flirty: [
         "For you? Anytime in a heartbeat! 😉",
         "You're very welcome! You owe me a coffee now though!",
         "Always happy to be your hero! 😊",
@@ -226,7 +226,7 @@ const DEFAULT_REPLIES = {
     "Thank you for your correspondence. I shall reply with comprehensive details.",
     "Respectfully received. We shall proceed as outlined."
   ],
-  flating: [
+  flirty: [
     "You always know just what to say to make things interesting! 😉",
     "I like the way you think! Let's keep this conversation going.",
     "You definitely caught my attention with that one!",
@@ -240,8 +240,15 @@ const DEFAULT_REPLIES = {
   ]
 };
 
+const TONE_ALIASES = { flating: "flirty" };
+
+const normalizeTone = (tone) => {
+  const lower = (tone || "professional").toLowerCase();
+  return TONE_ALIASES[lower] || lower;
+};
+
 export function getClientHeuristicReplies(message, tone = "professional") {
-  const normTone = (tone || "professional").toLowerCase();
+  const normTone = normalizeTone(tone);
   const clean = (message || "").trim();
 
   for (const intent of INTENT_PATTERNS) {
@@ -256,7 +263,7 @@ export function getClientHeuristicReplies(message, tone = "professional") {
 }
 
 export function getClientHeuristicEnhancements(text, tone = "professional") {
-  const normTone = (tone || "professional").toLowerCase();
+  const normTone = normalizeTone(tone);
   const clean = (text || "").trim();
   if (!clean) return [];
 
@@ -305,7 +312,7 @@ export function getClientHeuristicEnhancements(text, tone = "professional") {
         `${polished} Thank you for your continued cooperation.`
       );
       break;
-    case "flating":
+    case "flirty":
       variations.push(
         `${polished.replace(/[.]*$/, "")} 😉`,
         `You know, I was just thinking: ${polished.replace(/[.]*$/, "")}, and you on my mind made it even better.`,

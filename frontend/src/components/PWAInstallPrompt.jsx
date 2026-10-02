@@ -8,19 +8,31 @@ export default function PWAInstallPrompt() {
   const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
-    // Check if running on iOS
+    const isDismissed = () => {
+      try {
+        return localStorage.getItem('pwa-install-dismissed') === 'true';
+      } catch {
+        return false; // storage blocked (private mode): keep showing the prompt
+      }
+    };
+    const isStandalone = Boolean(
+      window.matchMedia?.('(display-mode: standalone)')?.matches
+    );
+
+    // Never nag users who already installed the app (or dismissed the prompt).
+    if (isStandalone || isDismissed()) return undefined;
+
+    // Modern iPadOS reports itself as macOS, so also check touch support.
     const isIOSDevice =
-      /iPad|iPhone|iPod/.test(navigator.userAgent) &&
-      !window.MSStream;
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    let timer;
 
     if (isIOSDevice) {
       setIsIOS(true);
-      // For iOS, show prompt after 5 seconds if not dismissed
-      const timer = setTimeout(() => {
-        const isDismissed = localStorage.getItem('pwa-install-dismissed');
-        if (!isDismissed) {
-          setShowPrompt(true);
-        }
+      timer = setTimeout(() => {
+        if (!isDismissed()) setShowPrompt(true);
       }, 5000);
       return () => clearTimeout(timer);
     }
@@ -29,30 +41,26 @@ export default function PWAInstallPrompt() {
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
+      if (isDismissed()) return;
 
-      // Show prompt after 3 seconds of user interaction
-      const isDismissed = localStorage.getItem('pwa-install-dismissed');
-      if (!isDismissed) {
-        const timer = setTimeout(() => {
-          setShowPrompt(true);
-        }, 3000);
+      clearTimeout(timer);
+      timer = setTimeout(() => setShowPrompt(true), 3000);
+    };
 
-        return () => clearTimeout(timer);
+    const handleAppInstalled = () => {
+      setShowPrompt(false);
+      try {
+        localStorage.setItem('pwa-install-dismissed', 'true');
+      } catch {
+        /* ignore */
       }
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    // Listen for app installed event
-    const handleAppInstalled = () => {
-      console.log('PWA was installed');
-      setShowPrompt(false);
-      localStorage.setItem('pwa-install-dismissed', 'true');
-    };
-
     window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
+      clearTimeout(timer);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
@@ -60,28 +68,44 @@ export default function PWAInstallPrompt() {
 
   const handleInstall = async () => {
     if (!deferredPrompt) {
+      setShowPrompt(false);
       return;
     }
 
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
+    try {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        try {
+          localStorage.setItem('pwa-install-dismissed', 'true');
+        } catch {
+          /* ignore */
+        }
+      }
+    } catch {
+      // The prompt can only be used once; ignore stale-prompt failures.
+    } finally {
+      setDeferredPrompt(null);
+      setShowPrompt(false);
+    }
+  };
 
-    setDeferredPrompt(null);
-    setShowPrompt(false);
-
-    if (outcome === 'accepted') {
+  const persistDismissal = () => {
+    try {
       localStorage.setItem('pwa-install-dismissed', 'true');
+    } catch {
+      /* ignore */
     }
   };
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    localStorage.setItem('pwa-install-dismissed', 'true');
+    persistDismissal();
   };
 
   const handleIOSInstall = () => {
     setShowPrompt(false);
-    localStorage.setItem('pwa-install-dismissed', 'true');
+    persistDismissal();
   };
 
   return (
@@ -171,28 +195,7 @@ export default function PWAInstallPrompt() {
                   >
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-bold text-lg flex items-center gap-2 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                            <motion.button
-                                whileHover={{ rotate: 360, scale: 1.05 }}
-                                transition={{ duration: 0.6, ease: "easeInOut" }}
-                                className="
-                                p-2 rounded-2xl
-                                bg-white/10
-                                backdrop-blur-xl
-                                border border-white/20
-                                shadow-lg shadow-indigo-500/20
-                                hover:shadow-indigo-500/40
-                                relative overflow-hidden
-                                "
-                            >
-                                {/* Glass shine */}
-                                <span className="absolute inset-0 bg-gradient-to-br from-white/30 via-white/5 to-transparent opacity-50 pointer-events-none" />
-
-                                <img
-                                src="https://i.postimg.cc/HkhmHFxy/icons8-chatbot-48.png"
-                                alt="Logo"
-                                className="relative z-10 w-8 h-8"
-                                />
-                            </motion.button>
+                        <Sparkles className="w-5 h-5 text-purple-400" />
                         Install Smart Reply
                       </h3>
                       <motion.button

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Smart Reply talks HTTPS to cloud LLM providers (Groq, OpenRouter, OpenAI),
+  but the optional self-hosted backend and local Ollama server are commonly
+  plain HTTP on the LAN. Android 9+ blocks cleartext by default, which would
+  silently break those setups, so cleartext is permitted here with a comment.
+  Cloud traffic is still HTTPS.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

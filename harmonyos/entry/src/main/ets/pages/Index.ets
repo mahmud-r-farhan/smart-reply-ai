@@ -22,7 +22,7 @@ struct Index {
   @State isLoading: boolean = false;
   @State statusBanner: string = '';
 
-  private tones: ToneStyle[] = ['friendly', 'professional', 'casual', 'concise', 'formal', 'romantic'];
+  private tones: ToneStyle[] = ['friendly', 'professional', 'casual', 'concise', 'formal', 'flirty', 'romantic'];
 
   aboutToAppear() {
     this.executeGeneration();
@@ -74,21 +74,36 @@ struct Index {
     this.suggestions = localReplies;
     this.isLoading = false;
 
-    // If hybrid or cloud mode is requested and cloud is active, trigger async background query
-    if (this.engineMode === 'cloud') {
+    // Hybrid mode: keep the instant local answer and upgrade it when the
+    // cloud response lands. Cloud mode: replace once the response arrives.
+    if (this.engineMode === 'cloud' || this.engineMode === 'hybrid') {
+      if (!CloudEngine.hasCredentials()) {
+        this.statusBanner = this.engineMode === 'cloud'
+          ? 'No cloud API key configured — showing on-device suggestions'
+          : 'On-device suggestions (add a cloud API key to enable upgrades)';
+        return;
+      }
+
       this.isLoading = true;
+      this.statusBanner = 'Cloud request in flight…';
       CloudEngine.queryCloud(
         this.inputText,
         `Generate ${this.selectedTone} smart replies for: "${this.inputText}"`
       ).then((cloudReplies) => {
         if (cloudReplies.length > 0) {
           this.suggestions = cloudReplies;
+          this.statusBanner = 'Cloud LLM response (upgraded from on-device)';
+        } else {
+          this.statusBanner = 'Cloud returned no usable answer — showing on-device suggestions';
         }
         this.isLoading = false;
       }).catch((err) => {
         console.error(`Cloud error: ${JSON.stringify(err)}`);
+        this.statusBanner = 'Cloud unavailable — showing on-device suggestions';
         this.isLoading = false;
       });
+    } else {
+      this.statusBanner = 'Offline mode — zero-network on-device suggestions';
     }
   }
 
@@ -244,6 +259,17 @@ struct Index {
             }
             .width('100%')
             .margin({ bottom: 12 })
+
+            if (this.statusBanner.length > 0) {
+              Text(this.statusBanner)
+                .fontSize(11)
+                .fontColor('#93C5FD')
+                .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+                .backgroundColor('#1E3A8A40')
+                .borderRadius(8)
+                .width('100%')
+                .margin({ bottom: 10 })
+            }
 
             ForEach(this.suggestions, (item: ReplySuggestion) => {
               ResultCard({

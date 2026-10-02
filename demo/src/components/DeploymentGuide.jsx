@@ -12,44 +12,57 @@ export default function DeploymentGuide() {
   };
 
   const RENDER_ENV = `# Smart Reply Backend Environment Configuration
-PORT=5000
 NODE_ENV=production
-ENABLE_CLUSTER=true
+PORT=10000                # Render provides $PORT automatically
+TRUST_PROXY=1             # Render terminates TLS in front of your service
 
-# Universal OpenAI-Compatible Cloud LLM Providers
-GROQ_API_KEY=gsk_your_groq_api_key_here
+# Universal OpenAI-compatible cloud LLM provider (any of Groq/OpenRouter/OpenAI)
 OPENROUTER_API_KEY=sk-or-v1-your_openrouter_key
-OLLAMA_HOST=http://localhost:11434
+LLM_BASE_URL=https://openrouter.ai/api/v1
+# Optional local model server:
+# LLM_BASE_URL=http://127.0.0.1:11434/v1
 
-# Caching & Singleflight Controls
-CACHE_TTL_MS=3600000
+# Caching, singleflight & rate limiting
+CACHE_TTL_MS=600000
 CACHE_MAX_ENTRIES=5000
-RATE_LIMIT_MAX=100
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX=60
 `;
 
-  const DOCKER_COMPOSE_SNIPPET = `# Production Docker Compose with Nginx & Redis
+  const DOCKER_COMPOSE_SNIPPET = `# Production stack: Nginx load balancer + scaled backend + Redis L2 cache
 services:
-  backend-cluster:
-    build: ./backend
-    restart: always
-    environment:
-      - PORT=5000
-      - NODE_ENV=production
-      - ENABLE_CLUSTER=true
-      - GROQ_API_KEY=\${GROQ_API_KEY}
-    ports:
-      - "5000:5000"
-
-  nginx:
+  load_balancer:
     image: nginx:alpine
-    restart: always
     ports:
-      - "80:80"
-      - "443:443"
+      - "5006:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - backend-cluster
+      backend:
+        condition: service_healthy
+
+  backend:
+    build: ./backend
+    restart: always
+    environment:
+      - PORT=5006
+      - NODE_ENV=production
+      - TRUST_PROXY=1
+      - WORKERS=2
+      - OPENROUTER_API_KEY=\${OPENROUTER_API_KEY}
+      - REDIS_URL=redis://cache:6379
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5006/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      cache:
+        condition: service_healthy
+
+  cache:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
 `;
 
   return (

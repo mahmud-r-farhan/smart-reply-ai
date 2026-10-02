@@ -76,7 +76,7 @@ docker compose up -d --scale backend=5
 #### What this provides:
 - **Nginx `least_conn` Load Balancing**: Distributes incoming HTTP requests to the replica with the lowest active connections.
 - **HTTP Keepalive Connection Pooling**: Keeps backend sockets persistent, avoiding TCP handshake overhead.
-- **Shared Redis LRU Cache**: All backend replicas share a high-performance Redis cache, achieving > 90% cache hit ratios for common prompts.
+- **Shared Redis LRU Cache**: All backend replicas share a high-performance Redis cache (`REDIS_URL`), achieving > 90% cache hit ratios for common prompts. The client is a dependency-free RESP implementation with a fail-open circuit breaker: if Redis is unreachable, workers silently fall back to their in-memory LRU tier and keep serving.
 - **Health Checks & Automatic Container Restarts**: Faulty containers are removed from the upstream pool automatically.
 
 ---

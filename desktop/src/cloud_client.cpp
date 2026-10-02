@@ -1,4 +1,4 @@
-#include "../include/cloud_client.h"
+#include "cloud_client.h"
 #include <windows.h>
 #include <wininet.h>
 #include <chrono>
@@ -128,17 +128,28 @@ bool CloudClient::PostHttpRequest(
         return false;
     }
 
-    // Read response
+    // Read the real HTTP status code (WinINet defaults to 0 otherwise)
+    DWORD statusCode = 0;
+    DWORD statusSize = sizeof(statusCode);
+    if (!HttpQueryInfoA(
+            hRequest,
+            HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER,
+            &statusCode,
+            &statusSize,
+            nullptr)) {
+        statusCode = 0;
+    }
+    outStatusCode = static_cast<int>(statusCode);
+
+    // Read response body
     char buffer[4096];
     DWORD bytesRead = 0;
     outResponse.clear();
 
     while (InternetReadFile(hRequest, buffer, sizeof(buffer) - 1, &bytesRead) && bytesRead > 0) {
         buffer[bytesRead] = '\0';
-        outResponse += buffer;
+        outResponse.append(buffer, bytesRead);
     }
-
-    outStatusCode = 200;
     InternetCloseHandle(hRequest);
     InternetCloseHandle(hConnect);
     InternetCloseHandle(hInternet);
@@ -183,7 +194,10 @@ std::vector<Suggestion> CloudClient::Complete(
     auto end = std::chrono::high_resolution_clock::now();
     int latency = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
 
-    if (!success || response.empty()) {
+    if (!success || response.empty() || statusCode < 200 || statusCode >= 300) {
+        if (success && (statusCode < 200 || statusCode >= 300)) {
+            std::cerr << "[CloudClient] Provider returned HTTP " << statusCode << std::endl;
+        }
         return {};
     }
 
