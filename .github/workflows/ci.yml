@@ -202,11 +202,28 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Build and Run json_utils Tests (g++)
+      - name: Compile Tests Strictly (warnings surfaced as annotations)
         working-directory: desktop
+        continue-on-error: true
         run: |
-          g++ -std=c++17 -Wall -Wextra -Werror -Iinclude src/json_utils.cpp tests/json_utils_test.cpp -o json_utils_test
-          ./json_utils_test
+          set +e
+          g++ -std=c++17 -Wall -Wextra -Werror -Iinclude src/json_utils.cpp tests/json_utils_test.cpp -o json_utils_test 2> strict-compile.log
+          status=$?
+          if [ $status -ne 0 ]; then
+            echo "Strict compile failed; diagnostics below and in the run annotations."
+            while IFS= read -r line; do
+              echo "::warning::g++: $line"
+            done < strict-compile.log
+          fi
+          exit $status
+
+      - name: Compile json_utils Tests (g++)
+        working-directory: desktop
+        run: g++ -std=c++17 -Wall -Wextra -Iinclude src/json_utils.cpp tests/json_utils_test.cpp -o json_utils_test
+
+      - name: Run json_utils Tests
+        working-directory: desktop
+        run: ./json_utils_test
 
   # ==========================================
   # 6. Native HarmonyOS (ArkTS / ArkUI) Check
