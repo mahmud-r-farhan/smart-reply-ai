@@ -1,4 +1,5 @@
 #pragma once
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -37,7 +38,7 @@ std::vector<std::string> ParseStringArray(const std::string& text);
  * Last-resort fallback for models that answer with prose: strip list markers
  * (1. / - / • / *) and leading/trailing quotes from each non-empty line.
  */
-std::vector<std::string> ParseLooseLines(const std::string& text, size_t maxItems);
+std::vector<std::string> ParseLooseLines(const std::string& text, std::size_t maxItems);
 
 } // namespace JsonUtils
 } // namespace SmartReply

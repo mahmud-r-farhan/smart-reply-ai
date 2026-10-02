@@ -1,6 +1,8 @@
 #include "json_utils.h"
 
 #include <cctype>
+#include <cstddef>
+#include <cstdint>
 #include <cstdio>
 
 namespace SmartReply {
@@ -218,7 +220,7 @@ std::vector<std::string> ParseStringArray(const std::string& text) {
     return results;
 }
 
-std::vector<std::string> ParseLooseLines(const std::string& text, size_t maxItems) {
+std::vector<std::string> ParseLooseLines(const std::string& text, std::size_t maxItems) {
     std::vector<std::string> results;
     std::string current;
 
