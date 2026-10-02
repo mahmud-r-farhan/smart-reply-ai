@@ -12,6 +12,7 @@ const resetEnv = () => {
     "LLM_BASE_URL",
     "ALLOW_CUSTOM_LLM_ENDPOINT",
     "LLM_MODEL",
+    "LLM_ALLOWED_HOSTS",
   ]) {
     delete process.env[key];
   }
@@ -36,6 +37,10 @@ describe("Provider resolver — SSRF & credential protection", () => {
 
   afterEach(resetEnv);
 
+  beforeEach(() => {
+    delete process.env.LLM_ALLOWED_HOSTS;
+  });
+
   test("uses the trusted default endpoint and server key when no config is supplied", () => {
     const resolved = resolveProvider(null, "SUGGESTIONS");
     assert.equal(resolved.baseURL, "https://openrouter.ai/api/v1");
@@ -51,6 +56,51 @@ describe("Provider resolver — SSRF & credential protection", () => {
     assert.equal(resolved.baseURL, "https://api.groq.com/openai/v1");
     assert.equal(resolved.apiKey, "server-secret-key");
     assert.equal(resolved.model, "llama-3.1-8b-instant");
+  });
+
+  test("blocks bracketed IPv6 private ranges even when custom endpoints are enabled", () => {
+    process.env.ALLOW_CUSTOM_LLM_ENDPOINT = "true";
+    for (const baseURL of [
+      "http://[fd00::1]:8080/v1",
+      "http://[fe80::1]:9000/v1",
+      "http://[::ffff:169.254.169.254]/v1",
+    ]) {
+      assert.throws(
+        () => resolveProvider({ baseURL }, "SUGGESTIONS"),
+        (error) => error instanceof HttpError && error.status === 400,
+        `expected ${baseURL} to be rejected`
+      );
+    }
+  });
+
+  test("custom localhost ports need the opt-in flag and never receive the server key", () => {
+    // Default: custom endpoints are disabled entirely.
+    assert.throws(
+      () => resolveProvider({ baseURL: "http://localhost:8080/v1" }, "SUGGESTIONS"),
+      (error) => error instanceof HttpError && error.status === 400
+    );
+
+    // Opted in: allowed, but the server-side secret must not be attached.
+    process.env.ALLOW_CUSTOM_LLM_ENDPOINT = "true";
+    const custom = resolveProvider({ baseURL: "http://localhost:8080/v1" }, "SUGGESTIONS");
+    assert.equal(custom.apiKey, "");
+    assert.equal(custom.trusted, false);
+
+    // Private IPs stay blocked even when custom endpoints are enabled...
+    assert.throws(
+      () => resolveProvider({ baseURL: "http://127.0.0.1:8080/v1" }, "SUGGESTIONS"),
+      (error) => error instanceof HttpError && error.status === 400
+    );
+    // ...unless the operator explicitly allowlists that origin.
+    process.env.LLM_ALLOWED_HOSTS = "http://192.168.1.10:11434";
+    const lan = resolveProvider({ baseURL: "http://192.168.1.10:11434/v1" }, "SUGGESTIONS");
+    assert.equal(lan.trusted, true);
+    assert.equal(lan.apiKey, "server-secret-key");
+
+    // The canonical local Ollama origin keeps working without any flag.
+    delete process.env.ALLOW_CUSTOM_LLM_ENDPOINT;
+    const ollama = resolveProvider({ baseURL: "http://localhost:11434/v1" }, "SUGGESTIONS");
+    assert.equal(ollama.baseURL, "http://localhost:11434/v1");
   });
 
   test("rejects cloud metadata and private-range endpoints", () => {

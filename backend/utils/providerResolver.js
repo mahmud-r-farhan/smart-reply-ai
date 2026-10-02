@@ -46,18 +46,25 @@ const presetOrigins = new Set(
     .map((url) => url.origin)
 );
 
-/** Extra allowlisted origins supplied by the operator, e.g. "https://llm.internal:8443". */
-const extraAllowedOrigins = new Set(
-  (process.env.LLM_ALLOWED_HOSTS || "")
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-    .map((entry) => {
-      const url = parseOrigin(entry.includes("://") ? entry : `https://${entry}`);
-      return url ? url.origin : null;
-    })
-    .filter(Boolean)
-);
+/**
+ * Extra allowlisted origins supplied by the operator, e.g.
+ * `LLM_ALLOWED_HOSTS=https://llm.internal:8443,http://192.168.1.10:11434`.
+ * Read lazily (and memoized) so tests and hot-reloads see env changes.
+ */
+let allowedHostsCache = { raw: null, origins: new Set() };
+
+const getExtraAllowedOrigins = () => {
+  const raw = process.env.LLM_ALLOWED_HOSTS || "";
+  if (allowedHostsCache.raw === raw) return allowedHostsCache.origins;
+
+  const origins = new Set();
+  for (const entry of raw.split(",").map((value) => value.trim()).filter(Boolean)) {
+    const url = parseOrigin(entry.includes("://") ? entry : `https://${entry}`);
+    if (url) origins.add(url.origin);
+  }
+  allowedHostsCache = { raw, origins };
+  return origins;
+};
 
 const isIpv4 = (hostname) => /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname);
 
@@ -74,21 +81,42 @@ const isPrivateIpv4 = (hostname) => {
   );
 };
 
+const stripBrackets = (hostname) => hostname.replace(/^\[|\]$/g, "");
+
+/** IPv4-mapped IPv6 (`::ffff:a.b.c.d`) — unwrap to the embedded IPv4 address. */
+const unwrapMappedIpv4 = (host) => {
+  const match = host.match(/^::ffff:(.+)$/i);
+  if (!match) return null;
+  const tail = match[1];
+  if (tail.includes(".")) return tail;
+  const hextets = tail.split(":");
+  if (hextets.length !== 2 || hextets.some((h) => !/^[0-9a-f]{1,4}$/i.test(h))) return null;
+  return hextets
+    .flatMap((h) => {
+      const value = h.padStart(4, "0");
+      return [parseInt(value.slice(0, 2), 16), parseInt(value.slice(2), 16)];
+    })
+    .join(".");
+};
+
 const isBlockedHostname = (hostname) => {
-  const host = hostname.toLowerCase();
+  const host = stripBrackets(hostname.toLowerCase());
   if (METADATA_HOSTNAMES.has(host)) return true;
   if (isPrivateIpv4(host)) return true;
   if (host.endsWith(".internal") || host.endsWith(".local")) return true;
   // IPv6 unique-local (fc00::/7) and link-local (fe80::/10)
   if (/^f[cd][0-9a-f]{2}:/i.test(host) || /^fe[89ab][0-9a-f]:/i.test(host)) return true;
+  // IPv4-mapped IPv6 (::ffff:169.254.169.254 and friends)
+  const mapped = unwrapMappedIpv4(host);
+  if (mapped && isPrivateIpv4(mapped)) return true;
   return false;
 };
 
 const isLocalOriginAllowed = (url) =>
-  LOCAL_HOSTNAMES.has(url.hostname.toLowerCase()) &&
-  // Only the canonical Ollama port is exempted by default; other local services
+  LOCAL_HOSTNAMES.has(stripBrackets(url.hostname.toLowerCase())) &&
+  // Only the canonical Ollama port is exempted; other local services
   // (databases, admin UIs, cloud metadata proxies...) stay unreachable.
-  (!url.port || url.port === "11434");
+  url.port === "11434";
 
 const truthy = (value) => /^(1|true|yes|on)$/i.test(String(value || "").trim());
 
@@ -131,13 +159,24 @@ export const resolveProvider = (providerConfig, operationType = "SUGGESTIONS") =
       throw new HttpError("providerConfig.baseURL must use http or https");
     }
 
-    if (isBlockedHostname(url.hostname) && !isLocalOriginAllowed(url)) {
+    const host = stripBrackets(url.hostname.toLowerCase());
+    if (METADATA_HOSTNAMES.has(host)) {
+      throw new HttpError("providerConfig.baseURL points to a cloud metadata address");
+    }
+    // Private/LAN endpoints are only reachable when the operator explicitly
+    // allowlists the origin (LLM_ALLOWED_HOSTS) or it is the local Ollama port;
+    // an attacker can set neither.
+    if (
+      isBlockedHostname(url.hostname) &&
+      !isLocalOriginAllowed(url) &&
+      !getExtraAllowedOrigins().has(url.origin)
+    ) {
       throw new HttpError("providerConfig.baseURL points to a blocked (private) address");
     }
 
-    if (presetOrigins.has(url.origin) || extraAllowedOrigins.has(url.origin)) {
+    if (presetOrigins.has(url.origin) || getExtraAllowedOrigins().has(url.origin)) {
       trusted = true;
-    } else if (allowCustomEndpoints() && !METADATA_HOSTNAMES.has(url.hostname)) {
+    } else if (allowCustomEndpoints()) {
       trusted = false; // allowed, but never receives the server-side secret
     } else {
       throw new HttpError(
@@ -179,12 +218,13 @@ export const resolveProvider = (providerConfig, operationType = "SUGGESTIONS") =
 /** True when the endpoint is a local (Ollama-style) server. */
 export const isLocalEndpoint = (baseURL) => {
   const url = parseOrigin(baseURL);
-  return Boolean(url && LOCAL_HOSTNAMES.has(url.hostname.toLowerCase()));
+  return Boolean(url && LOCAL_HOSTNAMES.has(stripBrackets(url.hostname.toLowerCase())));
 };
 
 export const providerResolverInternals = {
   presetOrigins,
-  extraAllowedOrigins,
+  stripBrackets,
+  getExtraAllowedOrigins,
   isBlockedHostname,
   isLocalOriginAllowed,
   allowCustomEndpoints,

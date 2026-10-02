@@ -465,9 +465,11 @@ Real-time telemetry: cache hit ratio, evictions, distributed (Redis) hits, singl
 Liveness/readiness probes used by Docker, Kubernetes, and the Nginx load balancer.
 
 > **Security note** — client-supplied `providerConfig.baseURL` values are only accepted for known provider origins
-> (OpenRouter, Groq, OpenAI, local Ollama on port 11434). The server-side API key is **never** attached to a
-> non-allowlisted endpoint, which blocks SSRF and credential-exfiltration attempts. Self-hosted gateways can be
-> opted in with `LLM_ALLOWED_HOSTS` or `ALLOW_CUSTOM_LLM_ENDPOINT=true` (see `backend/.env.example`).
+> (OpenRouter, Groq, OpenAI, local Ollama on port 11434). Cloud-metadata endpoints, private ranges, IPv4-mapped
+> IPv6 forms and `.internal`/`.local` hosts are rejected, and the server-side API key is **never** attached to a
+> non-allowlisted endpoint — blocking SSRF and credential-exfiltration attempts. Self-hosted gateways are opted in
+> with `LLM_ALLOWED_HOSTS` (the only way to allow private/LAN addresses) or `ALLOW_CUSTOM_LLM_ENDPOINT=true`, which
+> still never receives the server key (see `backend/.env.example`).
 
 ---
 
