@@ -192,7 +192,25 @@ jobs:
           }
 
   # ==========================================
-  # 5. Native HarmonyOS (ArkTS / ArkUI) Check
+  # 5. Native Desktop JSON Parser Unit Tests
+  # ==========================================
+  desktop-json-tests:
+    name: Native Desktop JSON Parser Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Build and Run json_utils Tests (g++)
+        working-directory: desktop
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -Iinclude \
+            src/json_utils.cpp tests/json_utils_test.cpp -o json_utils_test
+          ./json_utils_test
+
+  # ==========================================
+  # 6. Native HarmonyOS (ArkTS / ArkUI) Check
   # ==========================================
   harmonyos-native-check:
     name: Native HarmonyOS ArkTS Check & Validation
@@ -207,18 +225,14 @@ jobs:
         with:
           node-version: 20.x
 
-      - name: Validate HarmonyOS Manifests and ArkTS Modules
+      - name: Validate HarmonyOS Manifests and Resources
         run: |
           echo "Validating HarmonyOS Stage Model configuration..."
-          test -f harmonyos/build-profile.json5 || exit 1
-          test -f harmonyos/AppScope/app.json5 || exit 1
-          test -f harmonyos/entry/src/main/module.json5 || exit 1
-          test -f harmonyos/entry/src/main/ets/entryability/EntryAbility.ets || exit 1
-          test -f harmonyos/entry/src/main/ets/pages/Index.ets || exit 1
-          test -f harmonyos/entry/src/main/ets/services/HeuristicEngine.ets || exit 1
-          test -f harmonyos/entry/src/main/ets/services/CloudEngine.ets || exit 1
-          test -f harmonyos/entry/src/main/ets/services/NotificationBridge.ets || exit 1
-          echo "✓ All HarmonyOS Stage Model manifests and ArkTS source files verified!"
+          # Parses every manifest, resolves $string/$media/$color/$profile
+          # references, checks ArkTS entry points exist and rejects
+          # buildOption.arkOptions fields that hvigor's schema refuses.
+          node harmonyos/tools/validate_manifests.mjs
+          echo "✓ HarmonyOS manifests, resources and ArkTS entry points verified!"
 
       - name: Package Native HarmonyOS Project
         run: |
