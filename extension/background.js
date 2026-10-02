@@ -135,7 +135,12 @@ async function fetchResults(input, style = "professional", mode = "reply", to_la
 
       const url = `${cfg.backendUrl}${endpoint}`;
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 4000);
+      // The backend budgets up to 12s for a cold LLM call, so a 4s cap made
+      // "cloud" mode silently return heuristics while the server was still
+      // working. Hybrid keeps the short cap (instant answer wins) and cloud
+      // mode waits for the real model answer.
+      const backendTimeoutMs = cfg.engineMode === "cloud" ? 15000 : 4000;
+      const timeout = setTimeout(() => controller.abort(), backendTimeoutMs);
 
       try {
         const res = await fetch(url, {
