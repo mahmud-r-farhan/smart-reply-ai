@@ -1,3 +1,5 @@
+import 'constants.dart';
+
 /// Application Configuration and Metadata
 class AppConfig {
   // App Information
@@ -126,9 +128,21 @@ class SuccessMessages {
 }
 
 /// Content Limits
+///
+/// These mirror the server-side limits in `backend/utils/validation.js` so the
+/// UI never lets a user submit text the API would reject with a 400.
 class ContentLimits {
+  /// suggest-reply / enhance-text / translate-text
   static const int maxInputLength = 2000;
+
+  /// summarize-text accepts far longer documents.
+  static const int maxSummarizeLength = 8000;
+
   static const int minInputLength = 1;
   static const int maxResultsCount = 5;
   static const Duration requestTimeout = Duration(seconds: 30);
+
+  /// Longest input accepted for the given app mode.
+  static int maxLengthForMode(String mode) =>
+      mode == AppMode.summarize ? maxSummarizeLength : maxInputLength;
 }

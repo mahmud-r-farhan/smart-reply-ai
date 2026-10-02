@@ -55,9 +55,9 @@ class SettingsStorage {
     return _prefs?.getString(_keyBackendUrl) ?? AppConfig.baseUrl;
   }
 
+  /// Persist the backend bridge URL. An empty value disables the bridge, so
+  /// "clear the field and save" is a supported way to turn it off.
   Future<void> saveBackendUrl(String url) async {
-    final clean = url.trim();
-    if (clean.isEmpty) return;
-    await _prefs?.setString(_keyBackendUrl, clean);
+    await _prefs?.setString(_keyBackendUrl, url.trim());
   }
 }

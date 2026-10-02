@@ -24,6 +24,7 @@ class _ProviderSettingsSheetState extends State<ProviderSettingsSheet> {
   late TextEditingController _modelController;
   late double _temperature;
   bool _obscureApiKey = true;
+  String? _error;
 
   @override
   void initState() {
@@ -46,19 +47,42 @@ class _ProviderSettingsSheetState extends State<ProviderSettingsSheet> {
 
   void _applyPreset(ProviderConfig preset) {
     setState(() {
+      final endpointChanged = _baseUrlController.text.trim() != preset.baseURL;
       _nameController.text = preset.name;
       _baseUrlController.text = preset.baseURL;
       _modelController.text = preset.model;
+      // API keys are issued per endpoint: never carry one over to a different
+      // provider, or the previous provider's secret would be sent to the new one.
+      if (endpointChanged) _apiKeyController.clear();
+      _error = null;
     });
   }
 
   void _save() {
+    final baseUrl = _baseUrlController.text.trim();
+    final uri = Uri.tryParse(baseUrl);
+    final model = _modelController.text.trim();
+
+    if (baseUrl.isEmpty ||
+        uri == null ||
+        !uri.hasScheme ||
+        (uri.scheme != 'http' && uri.scheme != 'https') ||
+        uri.host.isEmpty) {
+      setState(() => _error =
+          'Enter a valid http(s) base URL, e.g. https://api.groq.com/openai/v1');
+      return;
+    }
+    if (model.isEmpty) {
+      setState(() => _error = 'Enter the model identifier, e.g. llama-3.1-8b-instant');
+      return;
+    }
+
     final updated = ProviderConfig(
       id: widget.currentConfig.id,
-      name: _nameController.text.trim(),
-      baseURL: _baseUrlController.text.trim(),
+      name: _nameController.text.trim().isEmpty ? uri.host : _nameController.text.trim(),
+      baseURL: baseUrl,
       apiKey: _apiKeyController.text.trim(),
-      model: _modelController.text.trim(),
+      model: model,
       temperature: _temperature,
       maxTokens: widget.currentConfig.maxTokens,
     );
@@ -187,7 +211,7 @@ class _ProviderSettingsSheetState extends State<ProviderSettingsSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'API Key (Stored only on your device)',
+                  'API Key (stored on this device, sent only to the base URL above)',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -245,6 +269,27 @@ class _ProviderSettingsSheetState extends State<ProviderSettingsSheet> {
               onChanged: (val) => setState(() => _temperature = val),
             ),
             const SizedBox(height: 12),
+
+            if (_error != null) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppTheme.errorColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.errorColor.withValues(alpha: 0.35)),
+                ),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.errorColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
 
             // Save Button
             ElevatedButton(

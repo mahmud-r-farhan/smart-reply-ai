@@ -22,12 +22,14 @@ class ApiService {
     required String message,
     required String format,
     ProviderConfig? providerConfig,
+    bool refresh = false,
   }) async {
     return _sendRequest(
       endpoint: ApiConstants.suggestReply,
       body: {
         'message': message,
         'format': format,
+        if (refresh) 'refresh': true,
         if (providerConfig != null) 'providerConfig': providerConfig.toJson(),
       },
       key: 'suggestions',
@@ -39,12 +41,14 @@ class ApiService {
     required String text,
     required String format,
     ProviderConfig? providerConfig,
+    bool refresh = false,
   }) async {
     return _sendRequest(
       endpoint: ApiConstants.enhanceText,
       body: {
         'text': text,
         'format': format,
+        if (refresh) 'refresh': true,
         if (providerConfig != null) 'providerConfig': providerConfig.toJson(),
       },
       key: 'enhancements',
@@ -57,6 +61,7 @@ class ApiService {
     required String language,
     required String format,
     ProviderConfig? providerConfig,
+    bool refresh = false,
   }) async {
     return _sendRequest(
       endpoint: ApiConstants.translateText,
@@ -64,6 +69,7 @@ class ApiService {
         'text': text,
         'language': language,
         'format': format,
+        if (refresh) 'refresh': true,
         if (providerConfig != null) 'providerConfig': providerConfig.toJson(),
       },
       key: 'translations',
@@ -75,12 +81,14 @@ class ApiService {
     required String text,
     required String format,
     ProviderConfig? providerConfig,
+    bool refresh = false,
   }) async {
     return _sendRequest(
       endpoint: ApiConstants.summarizeText,
       body: {
         'text': text,
         'format': format,
+        if (refresh) 'refresh': true,
         if (providerConfig != null) 'providerConfig': providerConfig.toJson(),
       },
       key: 'summaries',
