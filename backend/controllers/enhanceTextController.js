@@ -1,24 +1,31 @@
-import { generateEnhancements, FORMATS, isValidFormat } from "../services/openRouterService.js";
+import { generateEnhancements } from "../services/openRouterService.js";
+import { FORMATS, FORMAT_ALIASES } from "../utils/modelSelector.js";
+import {
+  LIMITS,
+  requireText,
+  requireFormat,
+  requireProviderConfig,
+} from "../utils/validation.js";
 
 export const enhanceText = async (req, res, next) => {
   try {
-    const { text, format = FORMATS.PROFESSIONAL, providerConfig } = req.body;
+    const text = requireText(req.body?.text, { field: "Text", max: LIMITS.ENHANCE });
+    const format = requireFormat(req.body?.format, {
+      fallback: FORMATS.PROFESSIONAL,
+      validFormats: Object.values(FORMATS),
+      aliases: FORMAT_ALIASES,
+    });
+    const providerConfig = requireProviderConfig(req.body?.providerConfig);
+    const options = { refresh: req.body?.refresh === true };
 
-    // Validation
-    if (!text || text.trim().length === 0) {
-      return res.status(400).json({ error: "Text is required" });
-    }
-    if (text.length > 2000) {
-      return res.status(400).json({ error: "Text must be under 2000 characters" });
-    }
-    if (!isValidFormat(format)) {
-      return res.status(400).json({ 
-        error: `Invalid format. Supported formats: ${Object.values(FORMATS).join(", ")}` 
-      });
-    }
+    const { results, source, latencyMs, model } = await generateEnhancements(
+      text,
+      format,
+      providerConfig,
+      options
+    );
 
-    const enhancements = await generateEnhancements(text.trim(), format, providerConfig);
-    res.json({ enhancements });
+    res.json({ enhancements: results, source, latencyMs, model });
   } catch (error) {
     next(error);
   }

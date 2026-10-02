@@ -4,11 +4,19 @@ import '../models/provider_config.dart';
 import '../models/reply_suggestion.dart';
 import '../services/hybrid_dispatcher.dart';
 import '../services/settings_storage.dart';
+import '../utils/app_config.dart';
 import '../utils/constants.dart';
 
 class ChatProvider extends ChangeNotifier {
   final HybridDispatcher _dispatcher;
   SettingsStorage? _storage;
+  bool _disposed = false;
+
+  /// Guards every async completion so a slow request cannot notify a
+  /// disposed provider (which would throw in debug builds).
+  void _safeNotify() {
+    if (!_disposed) notifyListeners();
+  }
 
   // State
   String _input = '';
@@ -21,6 +29,7 @@ class ChatProvider extends ChangeNotifier {
   EngineMode _engineMode = EngineMode.hybridRace;
   ProviderConfig _providerConfig = ProviderConfig.defaultPresets.first;
   int _lastLatencyMs = 0;
+  String _backendUrl = AppConfig.baseUrl;
 
   ChatProvider({
     HybridDispatcher? dispatcher,
@@ -31,10 +40,18 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<void> _initStorage() async {
-    _storage ??= await SettingsStorage.init();
-    _engineMode = _storage!.getEngineMode();
-    _providerConfig = _storage!.getProviderConfig();
-    notifyListeners();
+    try {
+      _storage ??= await SettingsStorage.init();
+      _engineMode = _storage!.getEngineMode();
+      _providerConfig = _storage!.getProviderConfig();
+      _backendUrl = _storage!.getBackendUrl();
+      // Honours SMART_REPLY_BACKEND_URL / the saved backend setting: when no
+      // BYOK key is configured, cloud modes fall back to the self-hosted API.
+      _dispatcher.updateBackendUrl(_storage!.getBackendUrl());
+    } catch (error) {
+      debugPrint('Failed to load saved settings: $error');
+    }
+    _safeNotify();
   }
 
   // Getters
@@ -48,6 +65,9 @@ class ChatProvider extends ChangeNotifier {
   EngineMode get engineMode => _engineMode;
   ProviderConfig get providerConfig => _providerConfig;
   int get lastLatencyMs => _lastLatencyMs;
+
+  /// Self-hosted Smart Reply backend used when no BYOK key is configured.
+  String get backendUrl => _backendUrl;
 
   // Setters
   void setInput(String value) {
@@ -84,6 +104,15 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Point the shared backend bridge at a different URL (empty disables it).
+  Future<void> setBackendUrl(String url) async {
+    final clean = url.trim();
+    _backendUrl = clean;
+    _dispatcher.updateBackendUrl(clean);
+    await _storage?.saveBackendUrl(clean);
+    notifyListeners();
+  }
+
   void clear() {
     _input = '';
     _results = [];
@@ -91,8 +120,9 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Generate results based on current mode and engine settings
-  Future<void> getResults() async {
+  /// Generate results based on current mode and engine settings.
+  /// [refresh] asks the backend to skip its cache (used by "Regenerate").
+  Future<void> getResults({bool refresh = false}) async {
     final cleanInput = _input.trim();
     if (cleanInput.isEmpty) return;
 
@@ -113,6 +143,7 @@ class ChatProvider extends ChangeNotifier {
             tone: _style,
             mode: _engineMode,
             providerConfig: _providerConfig,
+            refresh: refresh,
           );
           break;
 
@@ -122,6 +153,7 @@ class ChatProvider extends ChangeNotifier {
             tone: _style,
             mode: _engineMode,
             providerConfig: _providerConfig,
+            refresh: refresh,
           );
           break;
 
@@ -132,6 +164,7 @@ class ChatProvider extends ChangeNotifier {
             tone: _style,
             mode: _engineMode,
             providerConfig: _providerConfig,
+            refresh: refresh,
           );
           break;
 
@@ -140,6 +173,7 @@ class ChatProvider extends ChangeNotifier {
             text: cleanInput,
             mode: _engineMode,
             providerConfig: _providerConfig,
+            refresh: refresh,
           );
           break;
 
@@ -161,17 +195,18 @@ class ChatProvider extends ChangeNotifier {
       _error = e.toString().replaceFirst('Exception: ', '');
     } finally {
       _loading = false;
-      notifyListeners();
+      _safeNotify();
     }
   }
 
-  /// Regenerate results with current settings
+  /// Regenerate results with current settings, bypassing any server-side cache.
   Future<void> regenerate() async {
-    await getResults();
+    await getResults(refresh: true);
   }
 
   @override
   void dispose() {
+    _disposed = true;
     _dispatcher.dispose();
     super.dispose();
   }

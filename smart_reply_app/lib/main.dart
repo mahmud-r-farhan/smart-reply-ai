@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'providers/chat_provider.dart';
 import 'screens/home_screen.dart';
+import 'utils/app_config.dart';
 import 'utils/app_theme.dart';
 
 void main() {
@@ -37,7 +38,7 @@ class SmartReplyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ChatProvider()),
       ],
       child: MaterialApp(
-        title: 'Smart Reply',
+        title: AppConfig.appName,
         debugShowCheckedModeBanner: false,
         theme: AppTheme.darkTheme,
         home: const HomeScreen(),

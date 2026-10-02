@@ -1,5 +1,5 @@
 # -------------------------------------------------------------
-# SmartReply AI Backend - Production Multi-Stage Containerfile
+# SmartReply AI Backend - Production Containerfile
 # -------------------------------------------------------------
 
 FROM node:20-alpine AS base
@@ -8,16 +8,16 @@ WORKDIR /app
 # Install security updates & tools
 RUN apk update && apk upgrade && apk add --no-cache dumb-init curl
 
-# Copy dependency manifests
+# Copy dependency manifests first for optimal layer caching
 COPY package*.json ./
 
-# Install production dependencies only
-RUN npm ci --only=production && npm cache clean --force
+# Deterministic install of production dependencies only
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Copy application source
 COPY . .
 
-# Set secure non-root user
+# Drop privileges
 USER node
 
 # Expose microservice port

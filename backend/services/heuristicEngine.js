@@ -5,6 +5,17 @@
  * Aligned with Google ML Kit Smart Reply, Proofreading & Rewriting heuristics.
  */
 
+/**
+ * Tone aliases: v1.1.0 clients shipped the misspelled "flating" token.
+ * Accept it everywhere while the canonical value is "flirty".
+ */
+const TONE_ALIASES = { flating: "flirty" };
+
+const normalizeTone = (tone) => {
+  const lower = (tone || "professional").toLowerCase();
+  return TONE_ALIASES[lower] || lower;
+};
+
 // Intent patterns for smart replies
 const INTENT_PATTERNS = [
   {
@@ -35,7 +46,7 @@ const INTENT_PATTERNS = [
         "Dear colleague, I hope this message finds you well.",
         "Respectfully received. How may I be of service?"
       ],
-      flating: [
+      flirty: [
         "Hey there! You just brightened up my day! 😉",
         "Hello handsome/gorgeous! What pleasant surprise is this?",
         "Hey! Seeing your name pop up always makes me smile.",
@@ -77,7 +88,7 @@ const INTENT_PATTERNS = [
         "I am doing well and appreciate your courtesy.",
         "In good standing, thank you. I hope the same applies to you."
       ],
-      flating: [
+      flirty: [
         "Much better now that you've messaged me! 😉",
         "Can't complain, especially now that I'm talking to you.",
         "Doing great, but definitely thinking of you!",
@@ -119,7 +130,7 @@ const INTENT_PATTERNS = [
         "I would welcome the opportunity to convene at your convenience.",
         "Your request for a conference is acknowledged and accepted."
       ],
-      flating: [
+      flirty: [
         "I'd clear my whole schedule just to catch up with you! 😉",
         "A meeting with you is definitely the highlight of my week.",
         "Any time spent talking to you is time well spent!",
@@ -161,7 +172,7 @@ const INTENT_PATTERNS = [
         "Acknowledged with gratitude. I remain at your service.",
         "My sincere pleasure. Please accept my highest regards."
       ],
-      flating: [
+      flirty: [
         "For you? Anytime in a heartbeat! 😉",
         "You're very welcome! You owe me a coffee now though!",
         "Always happy to be your hero! 😊",
@@ -203,7 +214,7 @@ const INTENT_PATTERNS = [
         "Understood and excused. Let us proceed with our objectives.",
         "Thank you for your courteous note. All is well."
       ],
-      flating: [
+      flirty: [
         "You're totally forgiven... but you might have to make it up to me! 😉",
         "How could I ever stay mad at you?",
         "Forgiven instantly! You're much too charming.",
@@ -245,7 +256,7 @@ const INTENT_PATTERNS = [
         "I take my leave with respect. Good day.",
         "May your day proceed auspiciously."
       ],
-      flating: [
+      flirty: [
         "Already looking forward to the next time we talk! 😉",
         "Don't stay away too long!",
         "Leaving so soon? Miss you already!",
@@ -287,7 +298,7 @@ const DEFAULT_REPLIES = {
     "Thank you for your correspondence. I shall reply with comprehensive details.",
     "Respectfully received. We shall proceed as outlined."
   ],
-  flating: [
+  flirty: [
     "You always know just what to say to make things interesting! 😉",
     "I like the way you think! Let's keep this conversation going.",
     "You definitely caught my attention with that one!",
@@ -305,7 +316,7 @@ const DEFAULT_REPLIES = {
  * Generate instant heuristic smart replies
  */
 export function getHeuristicReplies(message, tone = "professional") {
-  const normTone = (tone || "professional").toLowerCase();
+  const normTone = normalizeTone(tone);
   const cleanMsg = (message || "").trim();
 
   // Match intent
@@ -326,7 +337,7 @@ export function getHeuristicReplies(message, tone = "professional") {
  * Aligned with Google ML Kit Proofreading / Rewriting
  */
 export function getHeuristicEnhancements(text, tone = "professional") {
-  const normTone = (tone || "professional").toLowerCase();
+  const normTone = normalizeTone(tone);
   const clean = (text || "").trim();
   if (!clean) return [];
 
@@ -374,7 +385,7 @@ export function getHeuristicEnhancements(text, tone = "professional") {
       );
       break;
 
-    case "flating":
+    case "flirty":
       variations.push(
         `${polished.replace(/[.]*$/, "")} 😉`,
         `You know, I was just thinking: ${polished.replace(/[.]*$/, "")}, and having you on my mind made it even better.`,

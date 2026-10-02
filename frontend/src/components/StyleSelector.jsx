@@ -1,4 +1,3 @@
-import React from "react";
 import { motion } from "framer-motion";
 import { Sparkles, Info } from "lucide-react";
 
@@ -9,7 +8,7 @@ const StyleSelector = ({ style, setStyle, showStyleInfo, setShowStyleInfo }) => 
     { value: "casual", label: "Casual", icon: "👋", description: "Relaxed and conversational" },
     { value: "concise", label: "Concise", icon: "⚡", description: "Ultra-short and to the point" },
     { value: "formal", label: "Formal", icon: "🎩", description: "Respectful and official tone" },
-    { value: "flating", label: "Flirty", icon: "😏", description: "Flirty compliment with romantic interest" },
+    { value: "flirty", label: "Flirty", icon: "😏", description: "Flirty compliment with romantic interest" },
     { value: "romantic", label: "Romantic", icon: "💕", description: "Affectionate and emotionally warm" }
   ];
 

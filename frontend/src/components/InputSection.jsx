@@ -1,4 +1,3 @@
-import React from "react";
 import { motion } from "framer-motion";
 import { Zap, Trash2, Clipboard, Sparkles } from "lucide-react";
 import TextareaAutoResize from "./TextareaAutoResize";
@@ -22,6 +21,9 @@ const SAMPLE_PROMPTS = {
   ]
 };
 
+// Mirror of the backend limits so users get instant feedback instead of a 400.
+const INPUT_LIMITS = { reply: 2000, enhance: 2000, translate: 2000, summarize: 8000 };
+
 const InputSection = ({ input, setInput, handleSubmit, loading, error, clear, mode }) => {
   let placeholder = "Paste the message you received here... (Ctrl/Cmd + Enter to generate)";
   let buttonText = "Generate Replies";
@@ -41,11 +43,17 @@ const InputSection = ({ input, setInput, handleSubmit, loading, error, clear, mo
     loadingText = "Summarizing...";
   }
 
+  const maxLength = INPUT_LIMITS[mode] ?? 2000;
+  const isOverLimit = input.length > maxLength;
+
   const handlePaste = async () => {
     try {
       const text = await navigator.clipboard.readText();
-      if (text) setInput(text);
-    } catch {}
+      if (text) setInput(text.slice(0, maxLength));
+    } catch {
+      // Clipboard permission denied or unsupported browser — users can still
+      // paste manually with the keyboard.
+    }
   };
 
   const samples = SAMPLE_PROMPTS[mode] || SAMPLE_PROMPTS.reply;
@@ -73,6 +81,7 @@ const InputSection = ({ input, setInput, handleSubmit, loading, error, clear, mo
           className="w-full min-h-[120px] max-h-[320px] p-4 bg-slate-800/50 border border-slate-700 rounded-2xl text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent overflow-hidden transition-all text-sm leading-relaxed"
           placeholder={placeholder}
           value={input}
+          maxLength={maxLength + 500}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -89,8 +98,8 @@ const InputSection = ({ input, setInput, handleSubmit, loading, error, clear, mo
           >
             <Clipboard className="w-3.5 h-3.5" /> Paste
           </button>
-          <span className="text-xs text-slate-500">
-            {input.length} / 3000
+          <span className={`text-xs ${isOverLimit ? 'text-red-400 font-semibold' : 'text-slate-500'}`}>
+            {input.length} / {maxLength}
           </span>
         </div>
       </div>
@@ -108,7 +117,8 @@ const InputSection = ({ input, setInput, handleSubmit, loading, error, clear, mo
       <div className="flex gap-3 mt-4">
         <button
           onClick={handleSubmit}
-          disabled={loading || !input.trim()}
+          disabled={loading || !input.trim() || isOverLimit}
+          title={isOverLimit ? `Please shorten your text to ${maxLength} characters` : undefined}
           className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold rounded-xl hover:from-indigo-600 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/30"
         >
           {loading ? (

@@ -386,6 +386,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (mode) handlers.switchMode(mode);
       if (input) utils.$('#inputText').value = input;
       await api.storage.local.remove(['pendingAction']);
+      if (api.action?.setBadgeText) api.action.setBadgeText({ text: '' });
       return;
     }
 

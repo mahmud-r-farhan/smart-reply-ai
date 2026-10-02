@@ -6,18 +6,6 @@
  * - Optional Backend API Connection
  */
 
-try {
-  chrome.alarms.create("keepAlive", { periodInMinutes: 0.5 });
-} catch (e) {
-  console.error("Failed to create keep-alive alarm:", e);
-}
-
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === "keepAlive") {
-    // Keep-alive tick
-  }
-});
-
 // Register message listener
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "getResults") {
@@ -83,7 +71,8 @@ async function fetchResults(input, style = "professional", mode = "reply", to_la
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 6000);
 
-      const headers = { "Content-Type": "application/json" };
+      try {
+        const headers = { "Content-Type": "application/json" };
       if (cfg.apiKey?.trim()) {
         headers["Authorization"] = `Bearer ${cfg.apiKey.trim()}`;
       }
@@ -107,8 +96,6 @@ async function fetchResults(input, style = "professional", mode = "reply", to_la
         })
       });
 
-      clearTimeout(timeout);
-
       if (response.ok) {
         const data = await response.json();
         const rawContent = data.choices?.[0]?.message?.content || "";
@@ -121,6 +108,9 @@ async function fetchResults(input, style = "professional", mode = "reply", to_la
             model: cfg.model
           };
         }
+      }
+      } finally {
+        clearTimeout(timeout);
       }
     } catch (e) {
       console.warn("Direct cloud fetch failed, attempting backend or heuristic fallback:", e.message);
@@ -145,26 +135,34 @@ async function fetchResults(input, style = "professional", mode = "reply", to_la
 
       const url = `${cfg.backendUrl}${endpoint}`;
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 4000);
+      // The backend budgets up to 12s for a cold LLM call, so a 4s cap made
+      // "cloud" mode silently return heuristics while the server was still
+      // working. Hybrid keeps the short cap (instant answer wins) and cloud
+      // mode waits for the real model answer.
+      const backendTimeoutMs = cfg.engineMode === "cloud" ? 15000 : 4000;
+      const timeout = setTimeout(() => controller.abort(), backendTimeoutMs);
 
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify(body)
-      });
-      clearTimeout(timeout);
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify(body)
+        });
 
-      if (res.ok) {
-        const data = await res.json();
-        const list = data.suggestions || data.enhancements || data.translations || data.summaries || [];
-        if (list.length > 0) {
-          return {
-            results: list.slice(0, 4),
-            source: "backend-api",
-            latencyMs: Date.now() - startTime
-          };
+        if (res.ok) {
+          const data = await res.json();
+          const list = data.suggestions || data.enhancements || data.translations || data.summaries || [];
+          if (list.length > 0) {
+            return {
+              results: list.slice(0, 4),
+              source: "backend-api",
+              latencyMs: Date.now() - startTime
+            };
+          }
         }
+      } finally {
+        clearTimeout(timeout);
       }
     } catch (e) {
       console.warn("Backend fetch failed, using zero-latency heuristic:", e.message);
@@ -295,19 +293,66 @@ function initializeContextMenu() {
 }
 initializeContextMenu();
 
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === "smart-reply-selected") {
-    const selectedText = info.selectionText || "";
-    if (selectedText) {
-      chrome.storage.local
-        .set({
-          pendingAction: {
-            mode: "reply",
-            input: selectedText
-          }
-        })
-        .then(() => chrome.action.openPopup())
-        .catch(() => chrome.action.openPopup());
+chrome.contextMenus.onClicked.addListener(async (info) => {
+  if (info.menuItemId !== "smart-reply-selected") return;
+  const selectedText = info.selectionText || "";
+  if (!selectedText) return;
+
+  await chrome.storage.local.set({
+    pendingAction: { mode: "reply", input: selectedText }
+  });
+  await openPopupOrBadge();
+});
+
+/**
+ * Open the popup programmatically when the browser supports it (Chrome 127+).
+ * Otherwise mark the toolbar icon so the user knows a queued action is waiting.
+ */
+async function openPopupOrBadge() {
+  if (chrome.action?.openPopup) {
+    try {
+      await chrome.action.openPopup();
+      return;
+    } catch {
+      // Fall through to the badge hint.
     }
+  }
+  try {
+    await chrome.action.setBadgeBackgroundColor({ color: "#6366f1" });
+    await chrome.action.setBadgeText({ text: "•" });
+    await chrome.action.setTitle({ title: "Smart Reply Assistant — action ready, click to open" });
+  } catch {
+    // Badge API unavailable; the queued action still loads on the next click.
+  }
+}
+/**
+ * Keyboard shortcut: translate the current selection.
+ * (Declared in manifest.json under "commands".)
+ */
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command !== "translate-selected") return;
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return;
+
+    let selectedText = "";
+    try {
+      const response = await chrome.tabs.sendMessage(tab.id, { action: "getSelectedText" });
+      selectedText = response?.text || "";
+    } catch {
+      // Content script unavailable (chrome:// pages, PDF viewer...)
+      return;
+    }
+
+    if (!selectedText) return;
+
+    await chrome.storage.local.set({
+      pendingAction: { mode: "translate", input: selectedText }
+    });
+
+    await openPopupOrBadge();
+  } catch (error) {
+    console.error("translate-selected command failed:", error);
   }
 });

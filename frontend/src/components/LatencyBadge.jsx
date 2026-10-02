@@ -1,4 +1,3 @@
-import React from "react";
 import { Zap, Cloud } from "lucide-react";
 
 export default function LatencyBadge({ latencyMs, source, model }) {

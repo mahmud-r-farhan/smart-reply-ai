@@ -28,9 +28,12 @@ services:
       - PORT=5006
       - NODE_ENV=production
       - WORKERS=2
+      # One trusted hop: traffic always arrives through the Nginx service.
+      - TRUST_PROXY=1
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - LLM_BASE_URL=${LLM_BASE_URL:-https://openrouter.ai/api/v1}
       - REDIS_URL=redis://cache:6379
+      - CACHE_TTL_MS=600000
     expose:
       - "5006"
     deploy:
@@ -57,6 +60,8 @@ services:
 
   # ==============================================================
   # Distributed Cache & Fast Key-Value Store (Redis LRU)
+  # Used as the shared L2 cache tier; the backend fails open to its
+  # in-memory LRU cache whenever Redis is unreachable.
   # ==============================================================
   cache:
     image: redis:7-alpine

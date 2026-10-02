@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/provider_config.dart';
 import '../models/reply_suggestion.dart';
+import '../utils/app_config.dart';
 import '../utils/constants.dart';
 
 class ApiService {
@@ -10,7 +11,7 @@ class ApiService {
 
   ApiService({http.Client? client, String? baseUrl})
       : _client = client ?? http.Client(),
-        _baseUrl = baseUrl ?? ApiConstants.defaultLocalUrl;
+        _baseUrl = baseUrl ?? AppConfig.baseUrl;
 
   void updateBaseUrl(String url) {
     _baseUrl = url.trim();
@@ -21,12 +22,14 @@ class ApiService {
     required String message,
     required String format,
     ProviderConfig? providerConfig,
+    bool refresh = false,
   }) async {
     return _sendRequest(
       endpoint: ApiConstants.suggestReply,
       body: {
         'message': message,
         'format': format,
+        if (refresh) 'refresh': true,
         if (providerConfig != null) 'providerConfig': providerConfig.toJson(),
       },
       key: 'suggestions',
@@ -38,12 +41,14 @@ class ApiService {
     required String text,
     required String format,
     ProviderConfig? providerConfig,
+    bool refresh = false,
   }) async {
     return _sendRequest(
       endpoint: ApiConstants.enhanceText,
       body: {
         'text': text,
         'format': format,
+        if (refresh) 'refresh': true,
         if (providerConfig != null) 'providerConfig': providerConfig.toJson(),
       },
       key: 'enhancements',
@@ -56,6 +61,7 @@ class ApiService {
     required String language,
     required String format,
     ProviderConfig? providerConfig,
+    bool refresh = false,
   }) async {
     return _sendRequest(
       endpoint: ApiConstants.translateText,
@@ -63,6 +69,7 @@ class ApiService {
         'text': text,
         'language': language,
         'format': format,
+        if (refresh) 'refresh': true,
         if (providerConfig != null) 'providerConfig': providerConfig.toJson(),
       },
       key: 'translations',
@@ -74,12 +81,14 @@ class ApiService {
     required String text,
     required String format,
     ProviderConfig? providerConfig,
+    bool refresh = false,
   }) async {
     return _sendRequest(
       endpoint: ApiConstants.summarizeText,
       body: {
         'text': text,
         'format': format,
+        if (refresh) 'refresh': true,
         if (providerConfig != null) 'providerConfig': providerConfig.toJson(),
       },
       key: 'summaries',
@@ -101,7 +110,7 @@ class ApiService {
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 15));
+      ).timeout(ContentLimits.requestTimeout);
 
       stopwatch.stop();
 

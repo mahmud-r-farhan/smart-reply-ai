@@ -5,7 +5,6 @@ node_modules
 .env
 
 # others
-package-lock.json
 pnpm-lock.yaml
 dist
 demo/dist

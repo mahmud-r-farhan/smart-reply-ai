@@ -1,5 +1,6 @@
 class ApiConstants {
-  // Default fallback backend API URL (supports Android Emulator 10.0.2.2 or localhost)
+  // Default backend API URL: Android emulator loopback (10.0.2.2 maps to the
+  // host machine). Override with --dart-define=SMART_REPLY_BACKEND_URL=...
   static const String defaultLocalUrl = 'http://10.0.2.2:5006/api';
   static const String suggestReply = '/suggest-reply';
   static const String enhanceText = '/enhance-text';
@@ -61,7 +62,7 @@ class ResponseStyle {
   static const String casual = 'casual';
   static const String formal = 'formal';
   static const String concise = 'concise';
-  static const String flating = 'flating';
+  static const String flirty = 'flirty';
   static const String romantic = 'romantic';
 
   static const List<StyleOption> options = [
@@ -96,7 +97,7 @@ class ResponseStyle {
       description: 'Polite, traditional, and respectful',
     ),
     StyleOption(
-      value: flating,
+      value: flirty,
       label: 'Flirty',
       emoji: '😏',
       description: 'Playful charm with romantic interest',

@@ -50,7 +50,7 @@ Before filing an issue:
 2. Reproduce the bug on the latest `master` branch.
 3. Use our [Bug Report Template](.github/ISSUE_TEMPLATE/bug_report.yml) and include:
    - Operating system and version.
-   - Client runtime (Flutter, React, Extension, Win32 C++, or Rust).
+   - Client runtime (Flutter, React web, Chrome Extension, HarmonyOS ArkTS, or Win32 C++).
    - Engine mode (Smart Reply, Enhance, Translate, Summarize).
    - Input text and exact error message / stack trace.
    - Steps to reproduce.
@@ -119,8 +119,9 @@ Express.js microservice providing multi-provider cloud orchestration and heurist
 ```bash
 cd backend
 npm install
-npm run dev     # Starts nodemon development server on port 3000
-npm test        # Runs test suites
+npm run dev     # Starts the nodemon dev server on http://localhost:5006
+npm test        # Runs the Node test suite (node --test)
+npm run start:cluster   # Multi-core production cluster (WORKERS=N)
 ```
 
 ### 5. Native Win32 C++ Desktop (`desktop/`)
@@ -151,7 +152,7 @@ cmake --build . --config Release
 - **Dart / Flutter**: Follow [Effective Dart](https://dart.dev/guides/language/effective-dart) rules enforced by `flutter_lints`.
 - **JavaScript / React**: ES6+, modular JSX components, vanilla CSS variables matching our dark-mode glassmorphic theme.
 - **C++**: Modern C++17, RAII resource management, clean Win32 handle encapsulation.
-- **Rust**: Standard `rustfmt` and `clippy` checks.
+- **ArkTS (HarmonyOS)**: Keep Stage-model resources in sync and run the structure validation used by CI (`harmonyos-native-check`).
 
 ---
 

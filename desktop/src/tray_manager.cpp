@@ -1,4 +1,4 @@
-#include "../include/tray_manager.h"
+#include "tray_manager.h"
 #include <iostream>
 
 namespace SmartReply {

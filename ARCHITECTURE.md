@@ -9,7 +9,7 @@ This document provides a comprehensive overview of the design, system components
 SmartReply AI is engineered around three non-negotiable principles:
 1. **Zero-Latency Offline Guarantee**: The system provides immediate, deterministic responses (< 5ms) on-device using heuristic and rule-based NLP engines when offline or when no API key is configured.
 2. **Universal Cloud Orchestration (BYOK - Bring Your Own Key)**: Any OpenAI-compatible provider (Groq, OpenRouter, Ollama, OpenAI, DeepSeek, Together) can be plugged in without vendor lock-in.
-3. **True Cross-Platform Native Presence**: Available as Flutter (Android, iOS, macOS, Linux, Windows, Web), native Win32 C++ floating assistant, Rust/Tauri desktop, React Web SPA, and Chrome Extension MV3.
+3. **True Cross-Platform Native Presence**: Available as Flutter (Android, iOS, macOS, Linux, Windows, Web), a native Win32 C++ floating assistant, a native HarmonyOS ArkTS app, a React web SPA/PWA, and a Chrome Extension MV3.
 
 ---
 
