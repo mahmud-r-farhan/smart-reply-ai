@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/engine_mode.dart';
 import '../models/provider_config.dart';
+import '../utils/app_config.dart';
 
 /// Local Settings & Preferences Storage
 class SettingsStorage {
@@ -51,10 +52,12 @@ class SettingsStorage {
 
   /// Get optional backend URL
   String getBackendUrl() {
-    return _prefs?.getString(_keyBackendUrl) ?? 'http://10.0.2.2:5006/api';
+    return _prefs?.getString(_keyBackendUrl) ?? AppConfig.baseUrl;
   }
 
+  /// Persist the backend bridge URL. An empty value disables the bridge, so
+  /// "clear the field and save" is a supported way to turn it off.
   Future<void> saveBackendUrl(String url) async {
-    await _prefs?.setString(_keyBackendUrl, url);
+    await _prefs?.setString(_keyBackendUrl, url.trim());
   }
 }

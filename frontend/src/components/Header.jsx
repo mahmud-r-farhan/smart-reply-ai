@@ -1,9 +1,8 @@
 import { useState, memo } from "react";
 import { motion } from "framer-motion";
-import { Settings, Info } from "lucide-react";
 import SidePanel from "./SidePanel";
 
-const Header = memo(({ onOpenProviderSettings }) => {
+const Header = memo(() => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (

@@ -16,6 +16,16 @@ export class CloudEngine {
   };
 
   /**
+   * True when a cloud request can actually succeed: either a BYOK API key is
+   * set, or the provider points at a local Ollama-style server.
+   */
+  public static hasCredentials(provider: ProviderConfig = CloudEngine.defaultProvider): boolean {
+    const key = (provider.apiKey || '').trim();
+    const base = (provider.baseUrl || '').toLowerCase();
+    return key.length > 0 || base.includes('localhost') || base.includes('127.0.0.1');
+  }
+
+  /**
    * Dispatches chat completions query to cloud LLM using HarmonyOS Network Kit
    */
   public static async queryCloud(
@@ -58,10 +68,48 @@ export class CloudEngine {
 
       if (response.responseCode === 200 && response.result) {
         const rawJson = typeof response.result === 'string' ? response.result : JSON.stringify(response.result);
-        const parsed = JSON.parse(rawJson);
+        const parsed: ESObject = JSON.parse(rawJson);
         const content = parsed.choices?.[0]?.message?.content || '';
 
-        // Try extracting numbered suggestions or lines
+        // 1. Prefer a strict JSON array (or {replies:[...]} shape)
+        let jsonList: string[] = [];
+        try {
+          const inner: ESObject = JSON.parse(content);
+          if (Array.isArray(inner)) {
+            jsonList = inner.map((item: ESObject) => String(item).trim());
+          } else if (inner && Array.isArray(inner.replies)) {
+            jsonList = inner.replies.map((item: ESObject) => String(item).trim());
+          } else if (inner && Array.isArray(inner.suggestions)) {
+            jsonList = inner.suggestions.map((item: ESObject) => String(item).trim());
+          }
+        } catch (parseErr) {
+          // 2. Fall back to extracting the first bracketed array
+          const match = content.match(/\[[\s\S]*\]/);
+          if (match) {
+            try {
+              const inner: ESObject = JSON.parse(match[0]);
+              if (Array.isArray(inner)) {
+                jsonList = inner.map((item: ESObject) => String(item).trim());
+              }
+            } catch (bracketErr) {
+              jsonList = [];
+            }
+          }
+        }
+
+        jsonList = jsonList.filter((item: string) => item.length > 0).slice(0, 4);
+
+        if (jsonList.length > 0) {
+          return jsonList.map((text: string, idx: number): ReplySuggestion => ({
+            id: `cloud_${idx}_${Date.now()}`,
+            text: text,
+            tone: 'cloud',
+            source: 'cloud',
+            latencyMs: elapsed
+          }));
+        }
+
+        // 3. Last resort: numbered/bullet lines
         const lines = content
           .split('\n')
           .map((line: string) => line.replace(/^[\d\-•\*\.\s]+/, '').trim())

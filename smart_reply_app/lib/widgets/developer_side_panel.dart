@@ -1,14 +1,74 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../providers/chat_provider.dart';
+import '../utils/app_config.dart';
 import '../utils/app_theme.dart';
 
-class DeveloperSidePanel extends StatelessWidget {
+/// About panel: app/developer metadata (read from [AppConfig] so it can never
+/// drift from the build) plus the self-hosted backend URL used when no BYOK key
+/// is configured.
+class DeveloperSidePanel extends StatefulWidget {
   final VoidCallback onClose;
 
   const DeveloperSidePanel({
     super.key,
     required this.onClose,
   });
+
+  @override
+  State<DeveloperSidePanel> createState() => _DeveloperSidePanelState();
+}
+
+class _DeveloperSidePanelState extends State<DeveloperSidePanel> {
+  late final TextEditingController _backendController;
+  String? _backendError;
+
+  @override
+  void initState() {
+    super.initState();
+    _backendController =
+        TextEditingController(text: context.read<ChatProvider>().backendUrl);
+  }
+
+  @override
+  void dispose() {
+    _backendController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveBackendUrl() async {
+    final value = _backendController.text.trim();
+    final uri = value.isEmpty ? null : Uri.tryParse(value);
+
+    if (value.isNotEmpty &&
+        (uri == null ||
+            !uri.hasScheme ||
+            (uri.scheme != 'http' && uri.scheme != 'https') ||
+            uri.host.isEmpty)) {
+      setState(() => _backendError =
+          'Enter a valid http(s) URL, e.g. http://10.0.2.2:5006/api');
+      return;
+    }
+
+    await context.read<ChatProvider>().setBackendUrl(value);
+    if (!mounted) return;
+
+    setState(() => _backendError = null);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          value.isEmpty
+              ? 'Backend bridge disabled — on-device and BYOK cloud modes only'
+              : 'Backend bridge set to $value',
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        backgroundColor: AppTheme.backgroundCard,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +116,7 @@ class DeveloperSidePanel extends StatelessWidget {
                     Material(
                       color: Colors.transparent,
                       child: InkWell(
-                        onTap: onClose,
+                        onTap: widget.onClose,
                         borderRadius: BorderRadius.circular(8),
                         child: Padding(
                           padding: const EdgeInsets.all(8),
@@ -95,16 +155,14 @@ class DeveloperSidePanel extends StatelessWidget {
                         ),
                         child: Column(
                           children: [
-                           CircleAvatar(
+                            CircleAvatar(
                               radius: 36,
-                              backgroundImage: NetworkImage(
-                                'https://avatars.githubusercontent.com/u/114731414?v=4',
-                              ),
+                              backgroundImage: NetworkImage(AppConfig.developerAvatar),
                               backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.15),
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              'Mahmud Rahman',
+                              AppConfig.developerName,
                               style: Theme.of(context)
                                   .textTheme
                                   .titleSmall
@@ -114,7 +172,7 @@ class DeveloperSidePanel extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Full Stack Developer',
+                              AppConfig.developerTitle,
                               style: Theme.of(context)
                                   .textTheme
                                   .bodySmall
@@ -131,9 +189,91 @@ class DeveloperSidePanel extends StatelessWidget {
                         context,
                         'App',
                         [
-                          _buildInfoRow(context, 'Name', 'Smart Reply'),
-                          _buildInfoRow(context, 'Version', '0.2.0'),
-                          _buildInfoRow(context, 'License', 'MIT'),
+                          _buildInfoRow(context, 'Name', AppConfig.appName),
+                          _buildInfoRow(
+                            context,
+                            'Version',
+                            '${AppConfig.appVersion} (${AppConfig.buildNumber})',
+                          ),
+                          _buildInfoRow(context, 'License', AppConfig.licenseName),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      // Backend bridge configuration
+                      _buildSection(
+                        context,
+                        'Backend bridge',
+                        [
+                          Text(
+                            'Used when no cloud API key is set. Leave empty to disable.',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppTheme.textMuted,
+                                ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: AppTheme.surface.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: _backendError != null
+                                    ? AppTheme.errorColor.withValues(alpha: 0.6)
+                                    : AppTheme.borderColor.withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: TextField(
+                              controller: _backendController,
+                              keyboardType: TextInputType.url,
+                              autocorrect: false,
+                              style: const TextStyle(
+                                color: AppTheme.textPrimary,
+                                fontSize: 13,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: 'http://10.0.2.2:5006/api',
+                                hintStyle: TextStyle(
+                                  color: AppTheme.textMuted.withValues(alpha: 0.5),
+                                  fontSize: 13,
+                                ),
+                                border: InputBorder.none,
+                                contentPadding:
+                                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              ),
+                            ),
+                          ),
+                          if (_backendError != null) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              _backendError!,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppTheme.errorColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 10),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: ElevatedButton(
+                              onPressed: _saveBackendUrl,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primaryBlue,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 18,
+                                  vertical: 10,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              child: const Text(
+                                'Save backend URL',
+                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 20),
@@ -146,20 +286,21 @@ class DeveloperSidePanel extends StatelessWidget {
                             context,
                             Icons.language_rounded,
                             'GitHub',
-                            'https://github.com/mahmud-r-farhan',
+                            AppConfig.githubUrl,
                           ),
                           _buildLink(
                             context,
                             Icons.work_rounded,
                             'LinkedIn',
-                            'https://www.linkedin.com/in/mahmud-r-farhan/',
+                            AppConfig.linkedinUrl,
                           ),
                         ],
                       ),
                       const SizedBox(height: 20),
                       // Footer text
                       Text(
-                        '© 2024-${DateTime.now().year} Mahmud Rahman',
+                        '© ${AppConfig.licenseYear}-${DateTime.now().year} '
+                        '${AppConfig.copyrightHolder}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: AppTheme.textDisabled,
                             ),

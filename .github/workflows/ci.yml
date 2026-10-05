@@ -31,7 +31,7 @@ jobs:
 
       - name: Install Dependencies
         working-directory: backend
-        run: npm install
+        run: npm ci
 
       - name: Run Test Suite
         working-directory: backend
@@ -57,7 +57,11 @@ jobs:
 
       - name: Install Dependencies
         working-directory: frontend
-        run: npm install
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
 
       - name: Build Production Assets
         working-directory: frontend
@@ -81,11 +85,44 @@ jobs:
 
       - name: Install Dependencies
         working-directory: demo
-        run: npm install
+        run: npm ci
 
       - name: Build Demo Web Application
         working-directory: demo
         run: npm run build
+
+  # ==========================================
+  # 2c. Backend Container Build (Dockerfile regression guard)
+  # ==========================================
+  backend-docker-build:
+    name: Backend Container Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Build Production Image
+        run: docker build -t smart-reply-backend:ci ./backend
+
+      - name: Smoke Test Image (health endpoint)
+        run: |
+          docker run -d --name smart-reply-ci -p 5006:5006 smart-reply-backend:ci
+          healthy=0
+          for i in $(seq 1 20); do
+            if curl -fsS http://localhost:5006/health > /dev/null; then
+              healthy=1
+              echo "Health check passed"
+              break
+            fi
+            sleep 1
+          done
+          docker logs smart-reply-ci
+          docker rm -f smart-reply-ci
+          if [ "$healthy" != "1" ]; then
+            echo "Container never became healthy" >&2
+            exit 1
+          fi
 
   # ==========================================
   # 3. Flutter Multiplatform Analysis & Tests
@@ -155,7 +192,26 @@ jobs:
           }
 
   # ==========================================
-  # 5. Native HarmonyOS (ArkTS / ArkUI) Check
+  # 5. Native Desktop JSON Parser Unit Tests
+  # ==========================================
+  desktop-json-tests:
+    name: Native Desktop JSON Parser Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Compile json_utils Tests (g++)
+        working-directory: desktop
+        run: g++ -std=c++17 -Wall -Wextra -Werror -Iinclude src/json_utils.cpp tests/json_utils_test.cpp -o json_utils_test
+
+      - name: Run json_utils Tests
+        working-directory: desktop
+        run: ./json_utils_test
+
+  # ==========================================
+  # 6. Native HarmonyOS (ArkTS / ArkUI) Check
   # ==========================================
   harmonyos-native-check:
     name: Native HarmonyOS ArkTS Check & Validation
@@ -170,18 +226,14 @@ jobs:
         with:
           node-version: 20.x
 
-      - name: Validate HarmonyOS Manifests and ArkTS Modules
+      - name: Validate HarmonyOS Manifests and Resources
         run: |
           echo "Validating HarmonyOS Stage Model configuration..."
-          test -f harmonyos/build-profile.json5 || exit 1
-          test -f harmonyos/AppScope/app.json5 || exit 1
-          test -f harmonyos/entry/src/main/module.json5 || exit 1
-          test -f harmonyos/entry/src/main/ets/entryability/EntryAbility.ets || exit 1
-          test -f harmonyos/entry/src/main/ets/pages/Index.ets || exit 1
-          test -f harmonyos/entry/src/main/ets/services/HeuristicEngine.ets || exit 1
-          test -f harmonyos/entry/src/main/ets/services/CloudEngine.ets || exit 1
-          test -f harmonyos/entry/src/main/ets/services/NotificationBridge.ets || exit 1
-          echo "✓ All HarmonyOS Stage Model manifests and ArkTS source files verified!"
+          # Parses every manifest, resolves $string/$media/$color/$profile
+          # references, checks ArkTS entry points exist and rejects
+          # buildOption.arkOptions fields that hvigor's schema refuses.
+          node harmonyos/tools/validate_manifests.mjs
+          echo "✓ HarmonyOS manifests, resources and ArkTS entry points verified!"
 
       - name: Package Native HarmonyOS Project
         run: |

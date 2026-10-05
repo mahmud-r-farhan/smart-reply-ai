@@ -1,22 +1,34 @@
 import crypto from "crypto";
+import { RedisCache } from "./redisClient.js";
 
 /**
  * Production-Grade Multi-Tier Cache with LRU Eviction & Metrics
  * 
  * Supports:
- * 1. Fast in-memory LRU cache with TTL and maximum entry bounds.
- * 2. Hit/Miss statistics and latency acceleration (serves in < 1ms).
- * 3. Graceful degradation: handles any input safely without memory leakage.
+ * 1. Fast in-memory LRU cache with TTL and maximum entry bounds (L1).
+ * 2. Optional shared Redis tier (L2) so horizontally scaled replicas share
+ *    warm results — enabled automatically when REDIS_URL is configured.
+ * 3. Hit/Miss statistics and latency acceleration (serves in < 1ms).
+ * 4. Graceful degradation: any L2 failure falls back to L1 + upstream calls.
  */
-class CacheManager {
+export class CacheManager {
   /**
    * @param {number} ttlMs - Time-to-live in milliseconds (default: 10 mins)
    * @param {number} maxEntries - Maximum keys stored before LRU eviction (default: 5,000)
    */
-  constructor(ttlMs = 10 * 60 * 1000, maxEntries = 5000) {
+  /**
+   * @param {number} ttlMs - Time-to-live in milliseconds (default: 10 mins)
+   * @param {number} maxEntries - Maximum keys stored before LRU eviction (default: 5,000)
+   * @param {object} [options]
+   * @param {string|null} [options.redisUrl] Shared Redis URL (L2 tier)
+   */
+  constructor(ttlMs = 10 * 60 * 1000, maxEntries = 5000, { redisUrl = process.env.REDIS_URL || null } = {}) {
     this.cache = new Map();
     this.ttlMs = ttlMs;
     this.maxEntries = maxEntries;
+
+    // Optional distributed tier (fails open to L1 when unreachable)
+    this.distributed = redisUrl ? new RedisCache(redisUrl) : null;
 
     // Real-time cache metrics
     this.metrics = {
@@ -24,7 +36,39 @@ class CacheManager {
       misses: 0,
       evictions: 0,
       sets: 0,
+      distributedHits: 0,
     };
+  }
+
+  /**
+   * Read-through lookup used by the LLM service: L1 first, then the shared L2
+   * tier. Never throws; a broken L2 behaves as a cache miss.
+   */
+  async getAsync(key) {
+    const local = this.get(key);
+    if (local !== null && local !== undefined) return local;
+    if (!this.distributed) return null;
+
+    const remote = await this.distributed.get(key);
+    if (remote !== null && remote !== undefined) {
+      this.metrics.distributedHits++;
+      // Warm L1 so subsequent calls stay sub-millisecond.
+      this.set(key, remote, Math.min(this.ttlMs, 60 * 1000));
+      return remote;
+    }
+    return null;
+  }
+
+  /**
+   * Write-through to both tiers. The L2 write is best-effort and never blocks
+   * the request path longer than its timeout.
+   */
+  async setAsync(key, value, customTtlMs = null) {
+    const ttl = customTtlMs ?? this.ttlMs;
+    this.set(key, value, ttl);
+    if (this.distributed) {
+      await this.distributed.set(key, value, ttl);
+    }
   }
 
   /**
@@ -145,9 +189,18 @@ class CacheManager {
       hitRatioPercent: hitRatio,
       evictions: this.metrics.evictions,
       sets: this.metrics.sets,
+      distributedHits: this.metrics.distributedHits,
+      distributedEnabled: Boolean(this.distributed),
+      distributedAvailable: this.distributed ? this.distributed.enabled : false,
     };
   }
 }
 
-// Global shared cache instance (10 min TTL, max 5,000 items)
-export default new CacheManager(10 * 60 * 1000, 5000);
+// Global shared cache instance. TTL / capacity / Redis URL are configurable
+// through the environment for containerized deployments.
+const ttlMs = Number(process.env.CACHE_TTL_MS) || 10 * 60 * 1000;
+const maxEntries = Number(process.env.CACHE_MAX_ENTRIES) || 5000;
+
+export default new CacheManager(ttlMs, maxEntries, {
+  redisUrl: process.env.REDIS_URL || null,
+});

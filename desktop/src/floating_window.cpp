@@ -1,4 +1,4 @@
-#include "../include/floating_window.h"
+#include "floating_window.h"
 #include <windowsx.h>
 
 namespace SmartReply {

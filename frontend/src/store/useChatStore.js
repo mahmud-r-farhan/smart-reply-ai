@@ -3,31 +3,98 @@ import {
   getClientHeuristicReplies,
   getClientHeuristicEnhancements,
   getClientHeuristicTranslations,
-  getClientHeuristicSummary
+  getClientHeuristicSummary,
 } from "../utils/heuristicEngine";
-import { callClientCloudLLM, PROVIDER_PRESETS } from "../utils/universalCloudEngine";
+import {
+  callClientCloudLLM,
+  callBackendApi,
+  isLocalEndpoint,
+  PROVIDER_PRESETS,
+} from "../utils/universalCloudEngine";
 
 const LOCAL_STORAGE_KEY = "smart_reply_provider_config";
 const ENGINE_MODE_KEY = "smart_reply_engine_mode";
 
+// `/api` is proxied to the backend by the Vite dev server and by most static
+// hosts (Netlify/Vercel rewrites). Override with VITE_API_ENDPOINT if needed.
+const BACKEND_ENDPOINT = import.meta.env.VITE_API_ENDPOINT || "/api";
+
+const HYBRID_TIMEOUT_MS = 2500;
+const CLOUD_TIMEOUT_MS = 15000;
+
 function loadSavedProvider() {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return PROVIDER_PRESETS[0]; // Groq by default
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.baseURL === "string") return parsed;
+    }
+  } catch {
+    /* corrupted storage — fall back to defaults */
+  }
+  return PROVIDER_PRESETS[0];
 }
 
 function loadSavedEngineMode() {
   try {
     const raw = localStorage.getItem(ENGINE_MODE_KEY);
-    if (raw) return raw;
-  } catch {}
-  return "hybrid-race"; // Default: Hybrid Race (Zero Latency)
+    if (raw && ["hybrid-race", "offline-only", "cloud-only"].includes(raw)) return raw;
+  } catch {
+    /* ignore */
+  }
+  return "hybrid-race";
+}
+
+/** Reject after `ms`, clearing the timer no matter the outcome. */
+function withTimeout(promise, ms, onTimeout) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      onTimeout?.();
+      reject(new Error("RequestTimeout"));
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+function buildPrompt(mode, input, style, language, refresh = false) {
+  const suffix = refresh
+    ? "\nThe user pressed Regenerate: produce noticeably different wording from a previous answer."
+    : "";
+  switch (mode) {
+    case "enhance":
+      return `Text to enhance: "${input}"\nRewrite and polish in "${style}" tone. Return exactly 4 distinct variations as a JSON array of strings: ["v1", "v2", "v3", "v4"].${suffix}`;
+    case "translate":
+      return `Text to translate into ${language} (${style} tone): "${input}"\nProvide 4 distinct variations as a JSON array of strings: ["t1", "t2", "t3", "t4"].${suffix}`;
+    case "summarize":
+      return `Text to summarize: "${input}"\nProvide 4 distinct perspectives: executive summary, takeaway, bullet items, and quick recap as a JSON array of strings: ["s1", "s2", "s3", "s4"].${suffix}`;
+    case "reply":
+    default:
+      return `Context message: "${input}"\nGenerate 4 distinct short replies in "${style}" tone. Output strictly a JSON array of strings: ["r1", "r2", "r3", "r4"].${suffix}`;
+  }
+}
+
+function localHeuristics(mode, input, style, language) {
+  switch (mode) {
+    case "enhance":
+      return getClientHeuristicEnhancements(input, style);
+    case "translate":
+      return getClientHeuristicTranslations(input, language, style);
+    case "summarize":
+      return getClientHeuristicSummary(input);
+    case "reply":
+    default:
+      return getClientHeuristicReplies(input, style);
+  }
 }
 
 export const useChatStore = create((set, get) => {
+  // Module-scoped request bookkeeping: the request counter makes sure a stale
+  // response can never overwrite the results of a newer request.
   let abortController = null;
+  let requestCounter = 0;
+
+  const isStale = (requestId) => requestId !== requestCounter;
 
   return {
     input: "",
@@ -45,172 +112,194 @@ export const useChatStore = create((set, get) => {
 
     setInput: (val) => set({ input: val }),
     setStyle: (sty) => set({ style: sty }),
-    setMode: (m) => set({ mode: m, results: [], error: null }),
     setLanguage: (lang) => set({ language: lang }),
-    
+
+    setMode: (m) => {
+      // Invalidate any in-flight generation so its result cannot land in the
+      // new mode's results list.
+      requestCounter += 1;
+      abortController?.abort();
+      abortController = null;
+      set({ mode: m, results: [], error: null, latencyMs: 0, source: "heuristic", model: null, loading: false });
+    },
+
     setEngineMode: (m) => {
-      try { localStorage.setItem(ENGINE_MODE_KEY, m); } catch {}
-      set({ engineMode: m });
+      try {
+        localStorage.setItem(ENGINE_MODE_KEY, m);
+      } catch {
+        /* storage may be unavailable (private mode) */
+      }
+      set({ engineMode: m, error: null });
     },
 
     setProviderConfig: (config) => {
-      try { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(config)); } catch {}
-      set({ providerConfig: config });
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(config));
+      } catch {
+        /* ignore quota / privacy mode errors */
+      }
+      set({ providerConfig: config, error: null });
     },
 
-    clear: () => set({ input: "", results: [], error: null, latencyMs: 0 }),
+    clear: () =>
+      set({
+        input: "",
+        results: [],
+        error: null,
+        latencyMs: 0,
+        source: "heuristic",
+        model: null,
+      }),
 
-    getResults: async () => {
+    cancelRequest: () => {
+      requestCounter += 1;
+      abortController?.abort();
+      abortController = null;
+      set({ loading: false });
+    },
+
+    getResults: async (options = {}) => {
       const state = get();
       const cleanInput = state.input.trim();
       if (!cleanInput) return;
+      const refresh = options?.refresh === true;
 
-      if (abortController) {
-        abortController.abort();
-      }
+      const requestId = ++requestCounter;
+      abortController?.abort();
       abortController = new AbortController();
+      const { signal } = abortController;
 
-      set({ loading: true, error: null });
-      const startTime = performance.now();
+      const localResults = localHeuristics(state.mode, cleanInput, state.style, state.language);
+      const startedAt = performance.now();
+      const elapsed = () => Math.round(performance.now() - startedAt);
 
-      // 1. Generate local heuristic immediately
-      let localResults = [];
-      switch (state.mode) {
-        case "enhance":
-          localResults = getClientHeuristicEnhancements(cleanInput, state.style);
-          break;
-        case "translate":
-          localResults = getClientHeuristicTranslations(cleanInput, state.language, state.style);
-          break;
-        case "summarize":
-          localResults = getClientHeuristicSummary(cleanInput);
-          break;
-        case "reply":
-        default:
-          localResults = getClientHeuristicReplies(cleanInput, state.style);
-          break;
-      }
+      // Cancelled requests must never touch the store again.
+      const commit = (partial) => {
+        if (isStale(requestId) || signal.aborted) return false;
+        set(partial);
+        return true;
+      };
 
-      // If mode is offline-only, return local heuristic immediately
+      set({ loading: true, error: null, results: [], latencyMs: 0 });
+
+      // ---- On-device only ------------------------------------------------
       if (state.engineMode === "offline-only") {
-        const elapsed = Math.round(performance.now() - startTime);
-        set({
+        commit({
           results: localResults,
           source: "heuristic",
-          latencyMs: elapsed,
+          latencyMs: elapsed(),
           model: "on-device-rules",
-          loading: false
+          loading: false,
         });
         return;
       }
 
-      // Check if cloud credentials/endpoint available
-      const hasKey = Boolean(state.providerConfig?.apiKey?.trim());
-      const isLocalServer = state.providerConfig?.baseURL?.includes("localhost") || state.providerConfig?.baseURL?.includes("127.0.0.1");
+      const hasClientKey = Boolean(state.providerConfig?.apiKey?.trim());
+      const isLocalProvider = isLocalEndpoint(state.providerConfig?.baseURL || "");
 
-      if (!hasKey && !isLocalServer) {
-        // No API key provided: deliver instantaneous heuristic
-        const elapsed = Math.round(performance.now() - startTime);
-        set({
+      // ---- Shown instantly in hybrid mode, and used as the fallback ------
+      const serveLocal = (model = "on-device-rules") =>
+        commit({
           results: localResults,
           source: "heuristic",
-          latencyMs: elapsed,
-          model: "on-device-rules",
-          loading: false
-        });
-        return;
-      }
-
-      // Prepare Prompt for Cloud LLM
-      let prompt = "";
-      switch (state.mode) {
-        case "enhance":
-          prompt = `Text to enhance: "${cleanInput}"\nRewrite and polish in "${state.style}" tone. Return exactly 4 distinct variations as a JSON array of strings: ["v1", "v2", "v3", "v4"].`;
-          break;
-        case "translate":
-          prompt = `Text to translate into ${state.language} (${state.style} tone): "${cleanInput}"\nProvide 4 distinct variations as a JSON array of strings: ["t1", "t2", "t3", "t4"].`;
-          break;
-        case "summarize":
-          prompt = `Text to summarize: "${cleanInput}"\nProvide 4 distinct perspectives: executive summary, takeaway, bullet items, and quick recap as a JSON array of strings: ["s1", "s2", "s3", "s4"].`;
-          break;
-        case "reply":
-        default:
-          prompt = `Context message: "${cleanInput}"\nGenerate 4 distinct short replies in "${state.style}" tone. Output strictly a JSON array of strings: ["r1", "r2", "r3", "r4"].`;
-          break;
-      }
-
-      try {
-        // In hybrid-race mode, set a 1500ms race timeout
-        const timeoutMs = state.engineMode === "hybrid-race" ? 1800 : 10000;
-        const cloudPromise = callClientCloudLLM({
-          providerConfig: state.providerConfig,
-          prompt,
-          signal: abortController.signal
+          latencyMs: elapsed(),
+          model,
+          loading: false,
         });
 
-        const timerPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("RaceTimeout")), timeoutMs)
+      // Abort the in-flight fetch when the deadline passes so we never keep a
+      // request (and its connection) alive after the UI moved on.
+      const abortOnTimeout = () => abortController?.abort();
+
+      const callCloud = (timeoutMs) => {
+        if (hasClientKey || isLocalProvider) {
+          return withTimeout(
+            callClientCloudLLM({
+              providerConfig: state.providerConfig,
+              prompt: buildPrompt(state.mode, cleanInput, state.style, state.language, refresh),
+              signal,
+            }),
+            timeoutMs,
+            abortOnTimeout
+          );
+        }
+        // No BYOK credentials: use the shared backend when it is reachable.
+        return withTimeout(
+          callBackendApi({
+            endpoint: BACKEND_ENDPOINT,
+            mode: state.mode,
+            input: cleanInput,
+            style: state.style,
+            language: state.language,
+            refresh,
+            signal,
+          }),
+          timeoutMs,
+          abortOnTimeout
         );
+      };
 
-        let outcome;
-        if (state.engineMode === "cloud-only") {
-          outcome = await cloudPromise;
-        } else {
-          // Race or Fallback
-          try {
-            outcome = await Promise.race([cloudPromise, timerPromise]);
-          } catch (raceErr) {
-            if (raceErr.message === "RaceTimeout") {
-              // Graceful race resolution: return instant local results
-              outcome = {
-                results: localResults,
-                source: "heuristic",
-                latencyMs: Math.round(performance.now() - startTime),
-                model: "hybrid-local-race"
-              };
-            } else {
-              throw raceErr;
-            }
+      // ---- Hybrid race: local answer first, cloud upgrade when it lands --
+      if (state.engineMode === "hybrid-race") {
+        // Publish the zero-latency answer immediately (loading stays true so
+        // the UI can show that an upgrade is still in flight).
+        if (
+          !commit({
+            results: localResults,
+            source: "heuristic",
+            latencyMs: elapsed(),
+            model: "on-device-rules",
+            loading: true,
+          })
+        ) {
+          return;
+        }
+
+        try {
+          const outcome = await callCloud(HYBRID_TIMEOUT_MS);
+          if (outcome?.results?.length) {
+            commit({
+              results: outcome.results,
+              source: outcome.source,
+              latencyMs: outcome.latencyMs ?? elapsed(),
+              model: outcome.model,
+              loading: false,
+              error: null,
+            });
+          } else {
+            commit({ loading: false });
           }
+        } catch (error) {
+          if (error.name === "AbortError" || isStale(requestId)) return;
+          // Keep the local answer; surface a soft hint at most.
+          commit({ loading: false });
         }
+        return;
+      }
 
-        if (outcome.results?.length > 0) {
-          set({
-            results: outcome.results,
-            source: outcome.source,
-            latencyMs: outcome.latencyMs,
-            model: outcome.model,
-            error: null
-          });
-        } else {
-          set({
-            results: localResults,
-            source: "heuristic",
-            latencyMs: Math.round(performance.now() - startTime),
-            model: "fallback-rules"
-          });
-        }
-      } catch (err) {
-        if (err.name !== "AbortError") {
-          // Fallback to local heuristic on any network error
-          set({
-            results: localResults,
-            source: "heuristic",
-            latencyMs: Math.round(performance.now() - startTime),
-            model: "fallback-on-error"
-          });
-        }
-      } finally {
-        set({ loading: false });
+      // ---- Cloud only ----------------------------------------------------
+      try {
+        const outcome = await callCloud(CLOUD_TIMEOUT_MS);
+        const landed = commit({
+          results: outcome.results,
+          source: outcome.source,
+          latencyMs: outcome.latencyMs ?? elapsed(),
+          model: outcome.model,
+          error: null,
+          loading: false,
+        });
+        if (!landed) return;
+      } catch (error) {
+        if (error.name === "AbortError" || isStale(requestId)) return;
+        const message =
+          error.message === "RequestTimeout"
+            ? "Cloud provider timed out — showing instant on-device results instead."
+            : hasClientKey || isLocalProvider
+              ? `Cloud provider unavailable (${error.message}). Showing on-device results.`
+              : "No cloud credentials configured. Add an API key in Settings, or use the shared backend.";
+        commit({ error: message });
+        serveLocal("fallback-rules");
       }
     },
-
-    cancelRequest: () => {
-      if (abortController) {
-        abortController.abort();
-        abortController = null;
-        set({ loading: false });
-      }
-    }
   };
 });

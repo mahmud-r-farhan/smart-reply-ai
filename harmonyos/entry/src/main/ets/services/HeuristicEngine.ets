@@ -8,23 +8,41 @@ import { ReplySuggestion } from '../models/SmartReplyTypes';
 export class HeuristicEngine {
 
   /**
+   * Tone aliases: v1.1.0 shipped the misspelled 'flating' token.
+   * Accept it forever while the canonical value stays 'flirty'.
+   */
+  private static normalizeTone(tone: string): string {
+    const lower = tone.toLowerCase();
+    return lower === 'flating' ? 'flirty' : lower;
+  }
+
+  /**
    * Generates instant context-aware smart replies on-device
    */
   public static generateReplies(input: string, tone: string = 'friendly'): ReplySuggestion[] {
     const start = Date.now();
+    const activeTone = HeuristicEngine.normalizeTone(tone);
     const clean = input.toLowerCase().trim();
     const results: string[] = [];
 
     // Greeting patterns
     if (/(hi|hello|hey|good morning|good evening|good afternoon|howdy)/i.test(clean)) {
-      if (tone === 'professional' || tone === 'formal') {
+      if (activeTone === 'professional' || activeTone === 'formal') {
         results.push('Good day. How may I assist you today?');
         results.push('Hello, thank you for reaching out.');
         results.push('Greetings. I hope this message finds you well.');
-      } else if (tone === 'casual') {
+      } else if (activeTone === 'casual') {
         results.push('Hey there! What\'s up?');
         results.push('Yo! Hope you\'re having a good one.');
         results.push('Hey! Great to hear from you.');
+      } else if (activeTone === 'flirty') {
+        results.push('Hey there! You just brightened up my whole day! 😉');
+        results.push('Well hello! Always a pleasure hearing from you.');
+        results.push('Hi! You definitely know how to make an entrance.');
+      } else if (activeTone === 'romantic') {
+        results.push('Hello my love, hearing from you always makes my day. ❤️');
+        results.push('Hi darling, you were just on my mind.');
+        results.push('Hey you. Every message from you means the world to me.');
       } else {
         results.push('Hello! Great to hear from you.');
         results.push('Hi! How are things going?');
@@ -33,14 +51,18 @@ export class HeuristicEngine {
     }
     // Meeting & Scheduling patterns
     else if (/(meet|meeting|calendar|zoom|teams|schedule|sync|coffee|call|tomorrow|today)/i.test(clean)) {
-      if (tone === 'professional' || tone === 'formal') {
+      if (activeTone === 'professional' || activeTone === 'formal') {
         results.push('I would be glad to meet. Please send an invite.');
         results.push('That time works well for me. I have confirmed on my calendar.');
         results.push('I have a conflict at that hour. Could we reschedule to later in the afternoon?');
-      } else if (tone === 'concise') {
+      } else if (activeTone === 'concise') {
         results.push('Confirmed. See you then.');
         results.push('Works for me. Sending invite.');
         results.push('Need to reschedule.');
+      } else if (activeTone === 'flirty') {
+        results.push('Sounds great — it\'s a date! 😉');
+        results.push('Perfect, I\'ll clear my calendar for you.');
+        results.push('Works for me. Looking forward to seeing you.');
       } else {
         results.push('Sounds great! Looking forward to catching up.');
         results.push('That time works perfectly for me! See you then.');
@@ -49,7 +71,7 @@ export class HeuristicEngine {
     }
     // Gratitude / Appreciation
     else if (/(thanks|thank you|appreciate|grateful|kudos)/i.test(clean)) {
-      if (tone === 'professional' || tone === 'formal') {
+      if (activeTone === 'professional' || activeTone === 'formal') {
         results.push('You are most welcome. It was my pleasure to assist.');
         results.push('Glad I could help. Please let me know if you need anything else.');
       } else {
@@ -66,7 +88,7 @@ export class HeuristicEngine {
     }
     // Question / Inquiries
     else if (clean.includes('?')) {
-      if (tone === 'professional') {
+      if (activeTone === 'professional') {
         results.push('Thank you for inquiring. I am currently reviewing the details.');
         results.push('I will investigate this and provide a comprehensive update shortly.');
         results.push('Could you please provide additional context on this matter?');
@@ -77,7 +99,15 @@ export class HeuristicEngine {
       }
     }
     // Default fallback
-    else {
+    else if (activeTone === 'flirty') {
+      results.push('You always know just what to say to make things interesting! 😉');
+      results.push('I like the way you think! Let\'s keep this conversation going.');
+      results.push('You definitely caught my attention with that one!');
+    } else if (activeTone === 'romantic') {
+      results.push('Hearing from you always brings peace and joy to my heart. ❤️');
+      results.push('Thank you my love, you mean everything to me.');
+      results.push('Always right by your side in spirit and heart.');
+    } else {
       results.push('Got it, thank you for sharing!');
       results.push('Thanks for the update. I\'ll review this shortly.');
       results.push('Understood. Let me follow up on this soon.');
@@ -87,7 +117,7 @@ export class HeuristicEngine {
     return results.map((text, idx): ReplySuggestion => ({
       id: `heur_${idx}_${Date.now()}`,
       text: text,
-      tone: tone,
+      tone: activeTone,
       source: 'heuristic',
       latencyMs: elapsed < 1 ? 1 : elapsed
     }));
@@ -98,6 +128,7 @@ export class HeuristicEngine {
    */
   public static enhanceText(input: string, tone: string = 'friendly'): ReplySuggestion[] {
     const start = Date.now();
+    const activeTone = HeuristicEngine.normalizeTone(tone);
     let trimmed = input.trim();
     if (trimmed.length > 0) {
       trimmed = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
@@ -108,13 +139,21 @@ export class HeuristicEngine {
 
     const enhancedOptions: string[] = [];
 
-    if (tone === 'professional') {
+    if (activeTone === 'professional' || activeTone === 'formal') {
       enhancedOptions.push(`I would appreciate your attention to: ${trimmed}`);
       enhancedOptions.push(`Regarding the following matter: ${trimmed} Please let me know your thoughts.`);
       enhancedOptions.push(`${trimmed} Thank you for your continued collaboration.`);
-    } else if (tone === 'concise') {
+    } else if (activeTone === 'concise') {
       enhancedOptions.push(trimmed);
       enhancedOptions.push(`Update: ${trimmed}`);
+    } else if (activeTone === 'flirty') {
+      enhancedOptions.push(`${trimmed.replace(/[.]*$/, '')} 😉`);
+      enhancedOptions.push(`Just between us: ${trimmed} Hope that brought a smile to your face!`);
+      enhancedOptions.push(`${trimmed} But honestly, everything sounds better when talking with you!`);
+    } else if (activeTone === 'romantic') {
+      enhancedOptions.push(`${trimmed} Thinking of you brings warmth to my soul. ❤️`);
+      enhancedOptions.push(`From the bottom of my heart: ${trimmed}`);
+      enhancedOptions.push(`${trimmed} You mean the world to me.`);
     } else {
       enhancedOptions.push(`Hey! Just wanted to share: ${trimmed}`);
       enhancedOptions.push(`${trimmed} Hope this helps! 😊`);
@@ -125,7 +164,7 @@ export class HeuristicEngine {
     return enhancedOptions.map((text, idx): ReplySuggestion => ({
       id: `enh_${idx}_${Date.now()}`,
       text: text,
-      tone: tone,
+      tone: activeTone,
       source: 'heuristic',
       latencyMs: elapsed < 1 ? 1 : elapsed
     }));
@@ -136,6 +175,7 @@ export class HeuristicEngine {
    */
   public static translateText(input: string, targetLang: string, tone: string = 'friendly'): ReplySuggestion[] {
     const start = Date.now();
+    const activeTone = HeuristicEngine.normalizeTone(tone);
     const clean = input.toLowerCase().trim();
 
     const dictionary: Record<string, Record<string, string>> = {
@@ -162,7 +202,7 @@ export class HeuristicEngine {
     return [{
       id: `trans_${Date.now()}`,
       text: translated,
-      tone: tone,
+      tone: activeTone,
       source: 'heuristic',
       latencyMs: elapsed < 1 ? 1 : elapsed
     }];

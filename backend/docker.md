@@ -1,35 +1,35 @@
-### **Build and Run** (Example)
+### **Build and Run**
 
-1. **Build the Docker image**
-
+1. **Build the Docker image** (run from the repository root)
 ```bash
-docker build -t smart-reply-backend .
+docker build -t smart-reply-backend ./backend
 ```
 
 2. **Run the container**
-
 ```bash
-docker run -d -p 5006:3000 --name smart-reply \
-  -e PORT=3000 \
+docker run -d -p 5006:5006 --name smart-reply \
   -e OPENROUTER_API_KEY=your_openrouter_api_key \
   smart-reply-backend
 ```
 
-* This maps container port `3000` to host port `5006`.
-* `OPENROUTER_API_KEY` is passed as an environment variable to the container.
+* The service listens on **5006** inside and outside the container (`PORT` defaults to `5006`).
+* `OPENROUTER_API_KEY` is optional: without it the backend serves its built-in
+  zero-latency heuristic engine, and every response is labelled with `"source": "heuristic"`.
+* Add `-e REDIS_URL=redis://host:6379` to enable the shared L2 cache tier, or
+  `-e TRUST_PROXY=1` when the container runs behind a load balancer so rate
+  limiting sees real client IPs.
 
 3. **Verify**
    Open `http://localhost:5006/health` in your browser. You should see:
 
 ```json
-{ "status": "ok" }
+{ "status": "ok", "service": "smart-reply-backend" }
 ```
 
 ---
 
-> Optional improvements:
-
-* Use **`npm ci`** instead of `npm install` if you have `package-lock.json` for faster and more deterministic builds.
-* Add **multi-stage builds** to reduce image size if you also need dev dependencies for build tools.
+The image is built with `npm ci --omit=dev`, runs `node cluster.js` by default
+(multi-core workers, self-healing, graceful shutdown), runs as the non-root
+`node` user, and ships a `HEALTHCHECK` that polls `/health`.
 
 ---

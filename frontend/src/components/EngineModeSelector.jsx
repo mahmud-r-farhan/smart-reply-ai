@@ -1,4 +1,3 @@
-import React from "react";
 import { Zap, ShieldCheck, Cloud, Settings2 } from "lucide-react";
 
 const MODES = [

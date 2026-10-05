@@ -4,6 +4,12 @@ import '../models/reply_suggestion.dart';
 /// Executes in < 5ms with 0 network calls, providing instant offline replies,
 /// text enhancement, translation approximations, and summarization.
 class HeuristicEngine {
+  /// v1.1.0 shipped the misspelled "flating" token; accept it forever.
+  static String _normalizeTone(String tone) {
+    final lower = tone.toLowerCase();
+    return lower == 'flating' ? 'flirty' : lower;
+  }
+
   static final List<_IntentPattern> _intentPatterns = [
     _IntentPattern(
       regex: RegExp(r'\b(hi|hello|hey|good morning|good afternoon|good evening|howdy|sup)\b', caseSensitive: false),
@@ -32,7 +38,7 @@ class HeuristicEngine {
           'Dear colleague, I hope this message finds you well.',
           'Respectfully received. How may I be of service?',
         ],
-        'flating': [
+        'flirty': [
           'Hey there! You just brightened up my whole day! 😉',
           'Hello pleasant surprise! What can I do for you?',
           'Hey! Seeing your name pop up always makes me smile.',
@@ -79,7 +85,7 @@ class HeuristicEngine {
           'I am doing well and appreciate your courtesy.',
           'In good standing, thank you. I hope the same applies to you.',
         ],
-        'flating': [
+        'flirty': [
           'Much better now that you\'ve messaged me! 😉',
           'Can\'t complain, especially now that I\'m talking to you.',
           'Doing great, but definitely thinking of you!',
@@ -126,7 +132,7 @@ class HeuristicEngine {
           'I would welcome the opportunity to convene at your convenience.',
           'Your request for a conference is acknowledged and accepted.',
         ],
-        'flating': [
+        'flirty': [
           'I\'d clear my whole schedule just to catch up with you! 😉',
           'A meeting with you is definitely the highlight of my week.',
           'Any time spent talking to you is time well spent!',
@@ -173,7 +179,7 @@ class HeuristicEngine {
           'Acknowledged with gratitude. I remain at your service.',
           'My sincere pleasure. Please accept my highest regards.',
         ],
-        'flating': [
+        'flirty': [
           'For you? Anytime in a heartbeat! 😉',
           'You\'re very welcome! You owe me a coffee now though!',
           'Always happy to be your hero! 😊',
@@ -220,7 +226,7 @@ class HeuristicEngine {
       'Thank you for your correspondence. I shall reply with comprehensive details.',
       'Respectfully received. We shall proceed as outlined.',
     ],
-    'flating': [
+    'flirty': [
       'You always know just what to say to make things interesting! 😉',
       'I like the way you think! Let\'s keep this conversation going.',
       'You definitely caught my attention with that one!',
@@ -243,7 +249,7 @@ class HeuristicEngine {
   /// Generate instant offline smart replies (<5ms)
   static List<ReplySuggestion> generateReplies(String message, String tone) {
     final stopwatch = Stopwatch()..start();
-    final normTone = tone.toLowerCase();
+    final normTone = _normalizeTone(tone);
     final clean = message.trim();
 
     for (final intent in _intentPatterns) {
@@ -289,7 +295,7 @@ class HeuristicEngine {
     }
 
     final List<String> list = [];
-    final lowerTone = tone.toLowerCase();
+    final lowerTone = _normalizeTone(tone);
 
     if (lowerTone == 'friendly') {
       list.add('$polished Hope you\'re having a wonderful day! 😊');
@@ -306,7 +312,7 @@ class HeuristicEngine {
       list.add('Kindly note: $polished We appreciate your prompt attention to this matter.');
       list.add('In accordance with our discussion: $polished Respectfully submitted.');
       list.add('$polished Thank you for your continued cooperation.');
-    } else if (lowerTone == 'flating') {
+    } else if (lowerTone == 'flirty') {
       list.add('${polished.replaceAll(RegExp(r'[.]*$'), '')} 😉');
       list.add('You know, I was just thinking: $polished, and you on my mind made it even better.');
       list.add('$polished But honestly, everything sounds better when talking with you!');

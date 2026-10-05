@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../utils/app_config.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/constants.dart';
 
@@ -53,6 +54,9 @@ class _ModularTextInputState extends State<ModularTextInput> {
     _controller.dispose();
     super.dispose();
   }
+
+  /// Server-side limit for the active mode (2000 chars, 8000 for summarize).
+  int get _maxLength => ContentLimits.maxLengthForMode(widget.mode);
 
   String get _placeholder {
     switch (widget.mode) {
@@ -127,7 +131,7 @@ class _ModularTextInputState extends State<ModularTextInput> {
                   onChanged: widget.onInputChanged,
                   maxLines: 5,
                   minLines: 3,
-                  maxLength: 3000,
+                  maxLength: _maxLength,
                   buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                   style: const TextStyle(
                     color: AppTheme.textPrimary,
@@ -205,7 +209,7 @@ class _ModularTextInputState extends State<ModularTextInput> {
 
                       // Character count
                       Text(
-                        '${widget.input.length}/3000',
+                        '${widget.input.length}/$_maxLength',
                         style: TextStyle(
                           fontSize: 11,
                           color: AppTheme.textMuted.withValues(alpha: 0.5),

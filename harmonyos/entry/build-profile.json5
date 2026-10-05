@@ -1,10 +1,5 @@
 {
   "apiType": "stageMode",
-  "buildOption": {
-    "arkOptions": {
-      "entry": "./src/main/ets/entryability/EntryAbility.ets"
-    }
-  },
   "targets": [
     {
       "name": "default"

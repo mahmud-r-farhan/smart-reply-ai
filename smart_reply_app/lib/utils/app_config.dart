@@ -1,9 +1,11 @@
+import 'constants.dart';
+
 /// Application Configuration and Metadata
 class AppConfig {
   // App Information
-  static const String appName = 'Smart Reply';
-  static const String appVersion = '1.0.0';
-  static const int buildNumber = 1;
+  static const String appName = 'Smart Reply AI';
+  static const String appVersion = '1.1.0';
+  static const int buildNumber = 2;
   static const String packageName = 'com.smartreply.app';
   static const String bundleId = 'com.smartreply.app';
 
@@ -58,8 +60,13 @@ class AppConfig {
   static const int minAndroidApi = 21; // Android 5.0
   static const String minIosVersion = '12.0';
 
-  // API Configuration
-  static const String baseUrl = 'http://192.168.0.107:5006/api';
+  // API Configuration.
+  // Override at build time:
+  //   flutter run --dart-define=SMART_REPLY_BACKEND_URL=http://192.168.1.20:5006/api
+  static const String baseUrl = String.fromEnvironment(
+    'SMART_REPLY_BACKEND_URL',
+    defaultValue: 'http://10.0.2.2:5006/api',
+  );
 
   // License Information
   static const String licenseName = 'MIT License';
@@ -121,9 +128,21 @@ class SuccessMessages {
 }
 
 /// Content Limits
+///
+/// These mirror the server-side limits in `backend/utils/validation.js` so the
+/// UI never lets a user submit text the API would reject with a 400.
 class ContentLimits {
+  /// suggest-reply / enhance-text / translate-text
   static const int maxInputLength = 2000;
+
+  /// summarize-text accepts far longer documents.
+  static const int maxSummarizeLength = 8000;
+
   static const int minInputLength = 1;
   static const int maxResultsCount = 5;
   static const Duration requestTimeout = Duration(seconds: 30);
+
+  /// Longest input accepted for the given app mode.
+  static int maxLengthForMode(String mode) =>
+      mode == AppMode.summarize ? maxSummarizeLength : maxInputLength;
 }
